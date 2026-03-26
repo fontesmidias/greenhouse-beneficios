@@ -1,20 +1,10 @@
-version: "3.8"
+version: "3.7"
 
 services:
   web:
     image: greenhouse-app:latest
-    deploy:
-      restart_policy:
-        condition: any
     networks:
-      - traefik-public # Ajuste o nome caso sua rede do Traefik seja diferente (ex: web, proxy, etc)
-      - default
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.greenhouse-beneficios.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.greenhouse-beneficios.entrypoints=websecure"
-      - "traefik.http.routers.greenhouse-beneficios.tls.certresolver=letsencrypt" # Ou nome do seu resolver
-      - "traefik.http.services.greenhouse-beneficios.loadbalancer.server.port=3000"
+      - unibotnet
     volumes:
       - greenhouse_data:/app/data
       - greenhouse_uploads:/app/uploads
@@ -28,11 +18,25 @@ services:
       - EVO_SERVER_URL=${EVO_SERVER_URL}
       - EVO_GLOBAL_KEY=${EVO_GLOBAL_KEY}
       - EVO_INSTANCE_NAME=${EVO_INSTANCE_NAME}
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.greenhouse-beneficios.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.greenhouse-beneficios.entrypoints=websecure"
+        - "traefik.http.routers.greenhouse-beneficios.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.greenhouse-beneficios.loadbalancer.server.port=3000"
 
 volumes:
   greenhouse_data:
   greenhouse_uploads:
 
 networks:
-  traefik-public:
+  unibotnet:
     external: true
+    name: unibotnet
