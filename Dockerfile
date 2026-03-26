@@ -19,6 +19,7 @@ RUN npm run build
 
 # Imagem de produção
 FROM base AS runner
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
