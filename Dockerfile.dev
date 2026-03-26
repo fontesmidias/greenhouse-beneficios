@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copia o restante dos arquivos (O volume mapeado do docker-compose cobrirá a maior parte,
+# mas isso garante integridade caso rodem a imagem sem o compose)
+COPY . .
+
+EXPOSE 3000
+
+# Executa em modo de desenvolvimento com hot-reload (npm run dev)
+CMD ["npm", "run", "dev"]

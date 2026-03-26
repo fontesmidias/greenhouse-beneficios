@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GreenHouse - Portal de Benefícios 🍃
 
-## Getting Started
+Um portal moderno para gestão corporativa de benefícios e automação de assinaturas eletrônicas com validade jurídica (VA/VT). 
+Desenvolvido com o poder da Stack **Next.js 14, TailwindCSS, Prisma (SQLite) e PDF-lib**, arquitetado sob containerização pura em **Docker** (para VPS/Portainer).
 
-First, run the development server:
+## 🗂 Estrutura do Projeto
 
+Este projeto é independente e não usa mais gambiarras como o "n8n com Google Sheets". Tudo foi internalizado na aplicação garantindo estabilidade e registro legal das rotinas.
+
+- **Frontend:** Next.js Server Components e React com uma interface *Glassmorphism* limpa desenvolvida para Mobile-First (RH pode aprovar pelo celular).
+- **Backend APIs:**
+  - `POST /api/upload`: Leitura assíncrona da planilha de benefícios via `xlsx`.
+  - `GET /api/template`: Geração instantânea do arquivo modelo obrigatório do Departamento Pessoal.
+  - `POST /api/process`: Inserções ACID no banco SQLite e montagem em tempo-real dos arquivos `.pdf` oficiais a serem assinados.
+- **Log System:** Todos os passos, falhas e melhorias da AI são rastreados nativamente na pasta `logs/`.
+
+## 🚀 Como Rodar Localmente (Desenvolvimento)
+
+Abra o terminal na pasta `app-beneficios` e rode:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker-compose -f docker-compose.local.yml up -d
 ```
+> O volume espelhará o código ao vivo (Hot-Reload) em http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📦 Deploy para Produção (VPS via Portainer)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Apenas copie o conteúdo do `docker-compose.yml` da raiz e use no Portainer (Add Stack). Ele construirá a aplicação a partir do `Dockerfile` multi-stage que compila o Prisma e otimiza a imagem em Alpine Linux.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🌟 Funcionalidades
+1. **Modelos Exatos:** Você não precisa adivinhar o formato do Excel da folha. Baixe o modelo dinâmico no App.
+2. **Logs Transparentes:** Problemas ao ler linhas do Excel? O sistema te diz onde estão de maneira instantânea e guarda isso em Logs.
+3. **Assinatura Autônoma (Em breve):** Em vez de Gov.br, o colaborador usa nosso painel touch-friendly pelo Evolution API no Whatsapp. O IP dele é chancelado.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+_Desenvolvido sob o fluxo BMAD com os times de Arquitetura, UX e Desenvolvimento._

@@ -10,7 +10,7 @@ O código criado já está pronto para o Git. Para enviar ao seu GitHub privado:
    git add .
    git commit -m "feat: setup inicial do projeto com docker"
    git branch -M main
-   git remote add origin https://github.com/SEU-USUARIO/greenhouse-beneficios.git
+   git remote add origin https://github.com/fontesmidias/greenhouse-beneficios.git
    git push -u origin main
    ```
 
