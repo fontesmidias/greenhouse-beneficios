@@ -8,7 +8,7 @@ import { logger } from '../../../lib/logger';
 
 export async function POST(req: Request) {
   try {
-    const { token, signature } = await req.json();
+    const { token, signature, location } = await req.json();
 
     if (!token || !signature) {
       return NextResponse.json({ error: 'Token ou assinatura ausente.' }, { status: 400 });
@@ -61,8 +61,13 @@ export async function POST(req: Request) {
     const timestamp = new Date().toISOString();
     const hash = Buffer.from(`${token}-${timestamp}`).toString('base64');
     
-    page.drawText(`Assinado Eletronicamente por IP: ${ip}`, { x: 40, y: 30, size: 6, color: rgb(0, 0.5, 0) });
-    page.drawText(`Data/Hora: ${new Date(timestamp).toLocaleString('pt-BR')}`, { x: 40, y: 22, size: 6, color: rgb(0, 0.5, 0) });
+    // Convert implicitly to Brasilia timezone
+    const dateEstd = new Date(timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const locText = location || 'Não autorizada ou indisponível';
+
+    page.drawText(`Assinado Eletronicamente por IP: ${ip}`, { x: 40, y: 38, size: 6, color: rgb(0, 0.5, 0) });
+    page.drawText(`Localização do Dispositivo: ${locText}`, { x: 40, y: 30, size: 6, color: rgb(0, 0.5, 0) });
+    page.drawText(`Data/Hora (BRT): ${dateEstd}`, { x: 40, y: 22, size: 6, color: rgb(0, 0.5, 0) });
     page.drawText(`Hash de Autenticidade: ${hash}`, { x: 40, y: 14, size: 6, color: rgb(0, 0.5, 0) });
 
     const signedPdfBytes = await pdfDoc.save();
@@ -77,7 +82,8 @@ export async function POST(req: Request) {
       assinatura: {
         data: timestamp,
         ip: ip,
-        hash: hash
+        hash: hash,
+        localizacao: location || null
       },
       pdfOriginalPath: signedPdfPath
     });

@@ -11,6 +11,36 @@ function SignPortalContent() {
   const [hasSignature, setHasSignature] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [locationInfo, setLocationInfo] = useState<string>("Buscando localização...");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+            const data = await res.json();
+            if (data && data.address) {
+              const { suburb, city, town, village, country } = data.address;
+              const place = [suburb, city || town || village, country].filter(Boolean).join(", ");
+              setLocationInfo(place || `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
+            } else {
+              setLocationInfo(`Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
+            }
+          } catch (e) {
+             setLocationInfo("Falha ao obter endereço da localização");
+          }
+        },
+        (error) => {
+          setLocationInfo("Geolocalização não autorizada pelo dispositivo");
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      setLocationInfo("Geolocalização não suportada pelo navegador");
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,7 +128,7 @@ function SignPortalContent() {
       const res = await fetch('/api/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, signature: signatureDataUrl })
+        body: JSON.stringify({ token, signature: signatureDataUrl, location: locationInfo })
       });
       
       const data = await res.json();
