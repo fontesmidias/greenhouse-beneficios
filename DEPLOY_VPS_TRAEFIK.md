@@ -1,31 +1,32 @@
-# Deploy via Portainer Stack (Docker)
+# Deploy via Portainer Stack (Docker Swarm Mode)
 
-Para realizar o deploy 100% isolado e seguro na sua VPS usando Portainer, sem expor subdomínios ou chaves no repositório:
+Este projeto utiliza **Integração Contínua (CI/CD)** através do Github Actions. Isso significa que você **NÃO** precisa acessar o terminal da sua VPS para compilar a imagem. O GitHub faz isso automaticamente e publica no `ghcr.io` (GitHub Container Registry).
 
-## 1. O Desafio do Portainer em Cluster (Swarm Mode)
-Ao tentar colar a Stack no seu Portainer, ele barrou os comandos `build`, `container_name` e `expose` porque a sua instância do Portainer está operando como **Swarm** (Clusters Docker) e não como **Standalone**. Em Swarm, as regras são mais estritas:
+## 1. Como fazer o Deploy no Portainer (Atualizado para Swarm e N8N)
+Vá em `Stacks > Add Stack` no seu Portainer.
+Selecione **Web editor** ou **Repository** (apontando para o seu Github).
+Cole o conteúdo do arquivo `docker-compose.yml` que está configurado para puxar a imagem `ghcr.io/fontesmidias/greenhouse-beneficios:latest`.
 
-**Como resolver a imagem (Build):**
-O Swarm não constrói imagens na hora. Você precisará acessar o terminal da sua VPS (SSH) e rodar uma única vez:
-`git clone [link do seu repositorio] && cd app-beneficios`
-`docker build -t greenhouse-app:latest .`
+## 2. Variáveis de Ambiente (Environment variables)
+No Portainer, adicione as seguintes variáveis na seção de env vars:
 
-Após isso, o Portainer achará a imagem `greenhouse-app:latest` armazenada localmente para rodar a Stack!
+```env
+DOMAIN=beneficios.unibot.com.br
 
-## 2. A Rede Externa (Traefik) - O Erro 'network not found'
-A Stack tenta se plugar numa rede externa chamada `traefik-public`. O seu Portainer reclamou que "*network traefik-public could not be found*".
-Isso ocorre porque **você precisa descobrir o nome exato da rede no qual o seu Traefik (ou N8N) está rodando**.
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=SEU_EMAIL_AQUI
+SMTP_PASS=SUA_SENHA_DE_APP_AQUI
 
-1. No seu Portainer, vá em **Networks**. Veja o nome da rede onde o Traefik está amarrado (Geralmente é `traefik`, `proxy`, `web`, ou `n8n_default`).
-2. Adicionalmente, o Swarm exige que as redes externas sejam do tipo `overlay` (swarm-scoped).
-3. Após achar o nome real, troque o valor `traefik-public` no final do arquivo `docker-compose.yml` para o nome que você descobriu e o deploy passará!
+EVO_SERVER_URL=https://evo.unibot.com.br
+EVO_GLOBAL_KEY=SUA_GLOBAL_KEY_AQUI
+EVO_INSTANCE_NAME=SUA_INSTANCIA_AQUI
+```
 
-## 3. A Rede do Traefik
-No `docker-compose.yml`, o app assina a rede externa `traefik-public`.
-Se o seu Traefik na VPS usa um nome diferente de rede (ex: `web`, `traefik_net`, `proxy`, ou a default do n8n), você **DEVE** editar a stack e substituir `traefik-public` pelo nome exato da rede do Traefik.
+## 3. Segurança e Labels Traefik
+As labels do Traefik agora estão 100% amarradas dentro da chave `deploy` (exigência do Swarm).
+A rede também está especificada rigorosamente como `unibotnet`. Não é mais necessário alterar o nome da rede, pois ele já combina com o cluster do seu N8N.
 
-## 4. Deploy
+## 4. Deploy Final
 Clique em **Deploy the Stack**.
-> O Docker montará silenciosamente os diretórios `/app/uploads` e `/app/data` no host docker via volumes `greenhouse_data` e `greenhouse_uploads`. Sua base será persistente.
-
-Nenhuma porta pública foi exposta (apenas o hostname dinâmico do Traefik). Segurança máxima.
+> O Portainer vai fazer o download automático da imagem compilada pelo GitHub Actions (`ghcr.io/...`). Os diretórios de Banco de Dados local e Uploads de Planilhas permanecerão persistidos nos volumes `greenhouse_data` e `greenhouse_uploads`. Seu app iniciará em instantes.

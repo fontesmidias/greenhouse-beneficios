@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   web:
-    image: greenhouse-app:latest
+    image: ghcr.io/fontesmidias/greenhouse-beneficios:latest
     networks:
       - unibotnet
     volumes:
