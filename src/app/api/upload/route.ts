@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as xlsx from 'xlsx';
+import { logger } from '../../../lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,9 +8,11 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     
     if (!file) {
+      logger.warn("Upload falhou: Nenhum arquivo enviado no FormData");
       return NextResponse.json({ error: 'Nenhum arquivo enviado.' }, { status: 400 });
     }
 
+    logger.info(`Iniciando leitura do arquivo Excel: ${file.name} (${file.size} bytes)`);
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = xlsx.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -28,9 +31,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Planilha inválida. O cabeçalho deve conter NOME e CPF. Baixe o modelo padrão.' }, { status: 400 });
     }
 
+    logger.info(`Planilha lida validada com sucesso. Colaboradores: ${data.length}`, { file: file.name });
     return NextResponse.json({ success: true, count: data.length, rows: data }, { status: 200 });
 
   } catch (error: any) {
+    logger.error('Erro ao processar planilha na etapa de leitura:', { error: String(error) });
     console.error('Erro ao processar planilha:', error);
     return NextResponse.json({ error: 'Falha ao ler o arquivo Excel. Verifique se o formato está correto.', details: String(error) }, { status: 500 });
   }

@@ -12,6 +12,6 @@ services:
       # Mapeia o código fonte local para dentro do container
       - .:/app
       - /app/node_modules
-      - /app/.next
     environment:
       - NODE_ENV=development
+      - WATCHPACK_POLLING=true

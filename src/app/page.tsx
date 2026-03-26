@@ -1,15 +1,50 @@
 "use client";
 
-import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
   const [parsedRecords, setParsedRecords] = useState<any[]>([]);
-
+  const [lots, setLots] = useState<any[]>([]);
   const [dragging, setDragging] = useState(false);
+
+  // Sorting state for the Tracker Table
+  const [sortKey, setSortKey] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const fetchLots = async () => {
+    try {
+      const res = await fetch('/api/receipts');
+      const data = await res.json();
+      if (data.success && data.lots) {
+        setLots(data.lots);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLots();
+  }, []);
+
+  const deleteLot = async (comp: string) => {
+    if(!confirm(`Excluir permanentemente o lote ${comp} e todos os seus PDFs?`)) return;
+    try {
+      await fetch(`/api/receipts?competencia=${encodeURIComponent(comp)}`, { method: 'DELETE' });
+      fetchLots();
+    } catch(e) {}
+  };
+
+  const deleteReceipt = async (id: string, name: string) => {
+    if(!confirm(`Excluir permanentemente o recibo de ${name}?`)) return;
+    try {
+      await fetch(`/api/receipts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      fetchLots();
+    } catch(e) {}
+  };
 
   const processFile = async (file: File) => {
     setUploading(true);
@@ -29,8 +64,10 @@ export default function Home() {
       if (!res.ok) {
         setFeedback({ type: 'error', text: data.error || 'Erro desconhecido' });
       } else {
-        setFeedback({ type: 'success', text: `Planilha validada! ${data.count} colaboradores prontos para envio.` });
-        setParsedRecords(data.rows);
+        setFeedback({ type: 'success', text: `Planilha validada! ${data.count} colaboradores carregados.` });
+        const recordsRaw = data.rows || data.data || data;
+        const validRecords = Array.isArray(recordsRaw) ? recordsRaw : [recordsRaw];
+        setParsedRecords(validRecords);
       }
     } catch (err) {
       setFeedback({ type: 'error', text: 'Falha na conexão com o servidor.' });
@@ -41,33 +78,22 @@ export default function Home() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      await processFile(file);
-    }
-    e.target.value = ''; // reset input
+    if (file) await processFile(file);
+    e.target.value = '';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(true);
-  };
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-  };
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      await processFile(file);
+      await processFile(e.dataTransfer.files[0]);
     }
   };
 
   const processAndDispatch = async () => {
-    if (parsedRecords.length === 0) return;
+    if (!parsedRecords || parsedRecords.length === 0) return;
     setProcessing(true);
-    setFeedback({ type: 'warning', text: 'Gerando arquivos PDF corporativos e disparando. Por favor, aguarde...' });
+    setFeedback({ type: 'warning', text: 'Sintetizando Documentos Oficiais...' });
 
     try {
       const res = await fetch('/api/process', {
@@ -80,115 +106,119 @@ export default function Home() {
       if (!res.ok) {
         setFeedback({ type: 'error', text: data.error || 'Erro na geração dos PDFs.' });
       } else {
-        setFeedback({ type: 'success', text: `Concluído! ${data.count} PDFs gerados, salvos no sistema e lote criado.` });
-        setParsedRecords([]); // Clear memory
+        setFeedback({ type: 'success', text: `Concluído! Motor PDF processou o lote.` });
+        setParsedRecords([]); 
+        fetchLots();
       }
-    } catch (err) {
-      setFeedback({ type: 'error', text: 'Falha ao processar os arquivos.' });
+    } catch (err: any) {
+      setFeedback({ type: 'error', text: `Falha técnica: ${err.message}` });
     } finally {
       setProcessing(false);
     }
   };
 
+  const sortReceipts = (receipts: any[]) => {
+    return [...receipts].sort((a, b) => {
+      let valA = a[sortKey] || '';
+      let valB = b[sortKey] || '';
+      if (sortOrder === 'asc') return valA > valB ? 1 : -1;
+      return valA < valB ? 1 : -1;
+    });
+  };
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortOrder('desc');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-emerald-200 pb-10">
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-600 text-white p-2 rounded-xl shadow-inner">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
+    <div className="min-h-screen bg-[#070708] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200 pb-10">
+      
+      {/* GLOWING BACKGROUND MESH */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden flex justify-center z-[-1]">
+        <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/10 blur-[120px] rounded-full mix-blend-screen opacity-50"></div>
+      </div>
+
+      <header className="sticky top-0 z-50 bg-[#0A0A0B]/80 backdrop-blur-2xl border-b border-white/5 px-8 flex justify-between h-20 shadow-2xl items-center">
+        <div className="flex items-center gap-4">
+          <div className="relative flex items-center justify-center bg-gradient-to-br from-[#121214] to-[#1C1C1F] p-2.5 rounded-2xl ring-1 ring-white/10 shadow-[0_0_20px_rgba(16,185,129,0.15)] overflow-hidden">
+             <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50"></div>
+             <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
           </div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
-            GreenHouse <span className="text-emerald-600 font-light">Benefícios</span>
-          </h1>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold tracking-tight text-white leading-none">GreenHouse</h1>
+            <span className="text-zinc-500 font-medium text-[10px] uppercase tracking-widest mt-1">Plataforma Operacional</span>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-6xl w-full mx-auto p-4 md:p-8 space-y-6 md:space-y-8">
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 md:p-8 rounded-3xl shadow-[0_2px_20px_-10px_rgba(0,0,0,0.05)] border border-slate-100">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Gestão de Recibos</h2>
-            <p className="text-slate-500 mt-2 text-sm md:text-base max-w-xl leading-relaxed">
-              Faça o upload da planilha do mês para gerar, enviar e automatizar a coleta das assinaturas de VA e VT. Acompanhe em tempo real o status pelo celular ou desktop.
-            </p>
-          </div>
-          <a href="/api/template" download="Template_Beneficios_GreenHouse.xlsx" className="w-full md:w-auto bg-slate-900 hover:bg-emerald-600 text-white font-medium py-3.5 px-6 rounded-2xl transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2 group">
-            <svg className="w-5 h-5 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-            </svg>
-            Baixar Modelo Excel
-          </a>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+      <main className="max-w-[1400px] w-full mx-auto p-4 md:p-8 space-y-8 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          <div className="lg:col-span-5 flex flex-col h-full bg-gradient-to-br from-emerald-50 to-teal-100/40 p-1 md:p-2 rounded-[2rem] border border-emerald-100/50 shadow-sm relative overflow-hidden group">
-            <div className="bg-white/70 backdrop-blur-xl rounded-[1.5rem] p-6 md:p-8 h-full flex flex-col relative z-10 border border-white/60 shadow-[inset_0_0_15px_rgba(255,255,255,0.5)]">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                  <span className="bg-emerald-100 shadow-sm text-emerald-700 p-2 rounded-xl">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                    </svg>
-                  </span>
-                  Gerar Novo Lote
-                </h3>
+          {/* LEFTSIDE: UPLOAD AREA */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-[#111113]/60 backdrop-blur-xl p-8 rounded-[2rem] ring-1 ring-white/5 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              
+              <div className="flex justify-between items-center mb-2 relative z-10">
+                <h2 className="text-xl font-bold text-white tracking-tight">Ingestão de Base</h2>
+                <a href="/api/template" download="Template_Beneficios_Oficial.xlsx" className="flex items-center gap-1.5 text-[10px] font-bold text-[#0A0A0B] bg-emerald-400 hover:bg-emerald-300 py-1.5 px-3 rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] uppercase tracking-wide">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                  Modelo Excel
+                </a>
               </div>
-
+              <p className="text-zinc-500 text-xs mb-8 font-medium leading-relaxed">Arraste a planilha do Departamento Pessoal (XLSX). O motor processará regras e criará os contratos digitais.</p>
+              
               {feedback && (
-                <div className={`mb-4 p-4 rounded-xl text-sm font-medium flex items-center gap-2 ${feedback.type === 'success' ? 'bg-emerald-100 text-emerald-800' : feedback.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800 animate-pulse'}`}>
-                  {feedback.type === 'success' ? (
-                     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  ) : feedback.type === 'error' ? (
-                     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                  ) : (
-                     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  )}
+                <div className={`mb-6 p-4 rounded-2xl text-xs font-bold flex items-center gap-3 backdrop-blur-md border ${feedback.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                  {feedback.type === 'success' ? '✨ ' : '⚠️ '}
                   {feedback.text}
                 </div>
               )}
 
-              {parsedRecords.length > 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center animate-in fade-in zoom-in duration-300">
-                  <span className="text-4xl drop-shadow-sm mb-2">🎉</span>
-                  <h4 className="text-emerald-800 font-bold text-lg">Pronto para Geração!</h4>
-                  <p className="text-emerald-600 text-sm mt-1 mb-6">{parsedRecords.length} Colaboradores validados.</p>
-                  <button 
-                    onClick={processAndDispatch} 
-                    disabled={processing}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-75 flex justify-center items-center gap-2">
-                    {processing ? (
-                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Processando...</>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> 
-                        Gerar Lote de PDFs
-                      </>
-                    )}
+              {parsedRecords && parsedRecords.length > 0 ? (
+                <div className="flex flex-col items-center bg-[#0C0C0E] border border-white/10 rounded-3xl p-6 text-center shadow-inner relative overflow-hidden">
+                  <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-30"></div>
+                  
+                  <div className="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mb-4 ring-1 ring-emerald-500/20">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+                  </div>
+                  <h4 className="text-white font-bold text-lg mb-1">{parsedRecords.length} Colaboradores</h4>
+                  <p className="text-emerald-400/80 text-[10px] font-bold uppercase tracking-widest mb-6 border border-emerald-400/20 px-2 py-1 rounded-md bg-emerald-400/5">Pronto para Geração</p>
+                  
+                  <div className="w-full max-h-48 overflow-y-auto mb-6 bg-[#161618] p-2 rounded-2xl border border-white/5 text-xs text-left custom-scrollbar">
+                    <ul className="divide-y divide-white/5 border-t border-b border-transparent">
+                      {parsedRecords.slice(0, 50).map((r, i) => (
+                        <li key={i} className="py-2.5 px-3 flex justify-between items-center hover:bg-white/5 rounded-xl transition-colors">
+                          <span className="font-semibold text-zinc-300 truncate">{r.NOME}</span>
+                          <span className="font-mono text-zinc-500">{r.CPF}</span>
+                        </li>
+                      ))}
+                      {parsedRecords.length > 50 && <li className="py-3 text-center italic text-zinc-600 font-medium">...mais {parsedRecords.length - 50} ocultos</li>}
+                    </ul>
+                  </div>
+
+                  <button onClick={processAndDispatch} disabled={processing} className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#070708] font-bold py-3.5 px-6 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all active:scale-95 disabled:opacity-50">
+                    {processing ? 'Sintetizando...' : 'Compilar Documentos (PDF)'}
                   </button>
-                  <button onClick={() => setParsedRecords([])} disabled={processing} className="mt-4 text-sm text-slate-400 font-medium hover:text-slate-600 underline">Cancelar Lote</button>
+                  <button onClick={() => setParsedRecords([])} disabled={processing} className="mt-5 text-xs text-zinc-600 font-bold hover:text-white transition-colors uppercase tracking-widest">Descartar Lote</button>
                 </div>
               ) : (
                 <label 
-                  onDragOver={handleDragOver} 
-                  onDragLeave={handleDragLeave} 
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
                   onDrop={handleDrop}
-                  className={`flex-1 flex flex-col items-center justify-center w-full min-h-[220px] bg-white border-2 border-dashed rounded-2xl cursor-pointer transition-all ${uploading ? 'border-emerald-400 bg-emerald-50/50 opacity-70 cursor-wait' : dragging ? 'border-emerald-500 bg-emerald-100 scale-105 shadow-xl' : 'border-emerald-200 hover:bg-emerald-50/50 hover:border-emerald-400 group-hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.2)]'}`}>
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                    <div className={`w-16 h-16 mb-4 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${dragging ? 'bg-emerald-500 text-white scale-125' : 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-100 group-hover:scale-110'}`}>
-                      {uploading ? (
-                         <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      ) : (
-                        <svg className="w-8 h-8 transform group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                      )}
+                  className={`flex flex-col items-center justify-center w-full h-[280px] rounded-3xl cursor-pointer transition-all duration-300 border-2 ${uploading ? 'bg-white/5 border-white/10 cursor-wait opacity-50' : dragging ? 'bg-emerald-500/10 border-emerald-500/50 scale-[1.02] shadow-[0_0_30px_rgba(16,185,129,0.15)]' : 'bg-[#0C0C0E] border-dashed border-white/10 hover:border-emerald-500/30 hover:bg-white/5'}`}>
+                  <div className="flex flex-col items-center justify-center px-4 text-center">
+                    <div className={`w-14 h-14 mb-6 rounded-2xl flex items-center justify-center border transition-all duration-500 ${dragging ? 'bg-emerald-500 text-[#0A0A0B] rotate-12 border-emerald-400' : 'bg-[#18181A] text-zinc-500 border-white/10'}`}>
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     </div>
-                    <p className="mb-2 text-lg text-slate-700 font-semibold transition-all">
-                      {uploading ? <span className="text-emerald-600">Lendo Arquivo...</span> : dragging ? <span className="text-emerald-700 font-blod">Solte o arquivo agora!</span> : <><span className="text-emerald-600">Clique</span> ou arraste o Excel</>}
-                    </p>
+                    <p className="text-sm font-bold text-zinc-300">Drop Zone (XLSX, CSV)</p>
+                    <p className="text-xs font-medium text-zinc-600 mt-2">Arraste a base para a nuvem</p>
                   </div>
                   <input type="file" className="hidden" accept=".xlsx, .csv" onChange={handleFileUpload} disabled={uploading} />
                 </label>
@@ -196,18 +226,111 @@ export default function Home() {
             </div>
           </div>
           
-          {/* Tracking */}
-          <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_20px_-10px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col h-full">
-            <h3 className="text-xl font-bold text-slate-800 mb-6">Status dos Envios</h3>
-            <div className="flex flex-col gap-4">
-               {/* Simulação Placeholder */}
-               <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <span className="font-semibold text-slate-700">Competência MAIO/2026</span>
-                  <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-lg border border-amber-200">Aguardando novo roteamento</span>
-               </div>
+          {/* RIGHTSIDE: DATAGRID */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            <div className="bg-[#111113]/60 backdrop-blur-xl p-8 rounded-[2rem] ring-1 ring-white/5 shadow-2xl h-full flex flex-col relative overflow-hidden">
+              <div className="flex justify-between items-end mb-8 relative z-10">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">Monitor de Operações</h2>
+                  <p className="text-zinc-500 text-xs font-medium mt-1">Acervo de Documentos e Envio via Evolution API.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={fetchLots} className="p-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all border border-white/5" title="Recarregar">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-hidden flex flex-col rounded-3xl bg-[#09090B] ring-1 ring-white/5 z-10">
+                {lots.length === 0 ? (
+                   <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 p-12">
+                     <div className="w-16 h-16 bg-[#161618] rounded-2xl flex items-center justify-center mb-4 ring-1 ring-white/5">
+                        <svg className="w-8 h-8 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                     </div>
+                     <p className="font-bold text-sm text-zinc-400">Database Vazia</p>
+                     <p className="text-xs mt-1">Suba um lote para criar contratos</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
+                    {lots.map((lot, idx) => (
+                      <div key={idx} className="bg-[#141416] ring-1 ring-white/5 rounded-[1.25rem] overflow-hidden group">
+                        
+                        {/* LOT HEADER */}
+                        <div className="px-6 py-4 flex justify-between items-center bg-gradient-to-r from-white/[0.03] to-transparent border-b border-white/5">
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                               <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
+                               <h3 className="text-xs font-bold text-white uppercase tracking-widest leading-none">CMPT {lot.competencia}</h3>
+                            </div>
+                            <span className="text-[10px] font-medium text-zinc-500 pl-5">{lot.total} assinaturas pendentes</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <button onClick={() => deleteLot(lot.competencia)} className="text-[10px] bg-rose-500/10 text-rose-500 hover:text-rose-400 ring-1 ring-rose-500/20 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-500/20 transition-all uppercase tracking-wide" title="Purgar Lixo">
+                                Excluir Lote
+                             </button>
+                            <button className="text-[10px] bg-white text-black font-bold px-4 py-1.5 rounded-lg hover:bg-zinc-200 transition-colors uppercase tracking-wide shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                              Executar Disparo
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* TABLE */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-[#0A0A0B] text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                                <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors group/th" onClick={() => handleSort('nome')}>
+                                  Colaborador <span className="opacity-0 group-hover/th:opacity-100 transition-opacity">{sortKey === 'nome' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors group/th" onClick={() => handleSort('cpf')}>
+                                  Identificação <span className="opacity-0 group-hover/th:opacity-100 transition-opacity">{sortKey === 'cpf' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                </th>
+                                <th className="px-6 py-3">Timestamp / Ingestão</th>
+                                <th className="px-6 py-3">Status</th>
+                                <th className="px-6 py-3 text-right">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {sortReceipts(lot.receipts).map((rec: any, rIdx: number) => (
+                                <tr key={rIdx} className="hover:bg-white/[0.02] transition-colors group/row">
+                                  <td className="px-6 py-3.5 font-bold text-zinc-200 text-xs whitespace-nowrap">{rec.nome}</td>
+                                  <td className="px-6 py-3.5 font-mono text-zinc-500 text-[11px]">{rec.cpf}</td>
+                                  <td className="px-6 py-3.5 text-zinc-500 text-[10px] font-medium font-mono">
+                                    {new Date(rec.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                  </td>
+                                  <td className="px-6 py-3.5">
+                                    <div className="flex items-center">
+                                      <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded-md ring-1 ${rec.status === 'ASSINADO' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-400 ring-amber-500/20'}`}>
+                                        {rec.status}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-3.5 flex gap-1.5 justify-end opacity-20 group-hover/row:opacity-100 transition-opacity">
+                                    <a href={`/api/download?id=${rec.id}`} target="_blank" className="p-1.5 bg-[#1C1C1F] ring-1 ring-white/10 hover:ring-white/30 text-zinc-400 hover:text-white rounded-lg transition-all" title="Baixar Contrato Secundário">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    </a>
+                                    <button className="p-1.5 bg-[#1C1C1F] ring-1 ring-white/10 hover:ring-white/30 text-zinc-400 hover:text-white rounded-lg transition-all" title="Ping via Email">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                    </button>
+                                    <button className="p-1.5 bg-[#1C1C1F] ring-1 ring-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 rounded-lg transition-all" title="Disparar Protocolo Whatsapp">
+                                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766 0 1.01.272 1.996.827 2.842l-1.077 3.931 4.027-1.056c.801.5 1.706.772 2.656.772 3.181 0 5.768-2.586 5.768-5.766 0-3.181-2.586-5.767-5.768-5.767zm3.392 8.28c-.142-.401-.844-.954-1.583-1.258-.093-.038-.16-.057-.229.043-.068.1-.229.3-.393.447-.164.148-.328.163-.483.056-.913-.631-1.614-1.127-2.318-2.18-.111-.166.024-.265.175-.487.051-.074.1-.166.151-.25.051-.082.025-.152-.001-.25-.025-.1-.328-.79-.448-1.082-.119-.283-.241-.245-.331-.25-.088-.004-.189-.004-.29-.004s-.266.038-.405.188c-.139.15-5.32 5.097-5.32 8.814 0 3.717 3.238 6.556 5.688 8.355 2.45 1.799 4.398 2.052 5.965 1.703 1.567-.348 2.373-.974 2.665-1.921.291-.947.291-1.761.205-1.933-.087-.171-.32-.275-.623-.427z"/></svg>
+                                    </button>
+                                    <button onClick={() => deleteReceipt(rec.id, rec.nome)} className="p-1.5 ml-2 bg-[#1C1C1F] ring-1 ring-rose-500/20 hover:bg-rose-500/10 text-rose-500 hover:text-rose-400 rounded-lg transition-all" title="Expurgar do Sistema">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          
         </div>
       </main>
     </div>

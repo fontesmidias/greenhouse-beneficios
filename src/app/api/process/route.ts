@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { PDFDocument, rgb } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
-
-// Instantiate Prisma
-const prisma = new PrismaClient();
+import { logger } from '../../../lib/logger';
+import { db } from '../../../lib/db';
+import { v4 as uuidv4 } from 'uuid';
+import { generateReceiptPDF } from '../../../lib/pdf';
 
 export async function POST(req: NextRequest) {
   try {
     const { records } = await req.json();
+
     if (!records || !Array.isArray(records)) {
-      return NextResponse.json({ error: 'Nenhum dado enviado.' }, { status: 400 });
+      return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
     }
 
     const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -19,66 +19,78 @@ export async function POST(req: NextRequest) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
+    // Auto-cleanup: remove PDFs older than 30 days automatically
+    db.cleanup(30);
+
     let successCount = 0;
 
     for (const record of records) {
       if (!record.NOME || !record.CPF) continue;
 
-      // 1. Store the Receipt in the Database to generate the magic link and strict tracking
-      const receipt = await prisma.receipt.create({
-        data: {
-          nome: record.NOME,
-          cpf: String(record.CPF),
-          telefone: String(record.TELEFONE || ''),
-          email: record.EMAIL || null,
-          va_valor: Number(record.VA_VALOR_DIARIO || 0),
-          vt_valor: Number(record.VT_VALOR_DIARIO || 0),
-          dias_uteis: Number(record.DIAS_UTEIS || 0),
-          dias_desconto: Number(record.DIAS_DESCONTO || 0),
-          observacao: record.OBSERVACAO || '',
-          competencia: 'MAIO/2026', // ToDo: Send via frontend input
+      const receiptId = uuidv4();
+      const magicToken = uuidv4();
+      
+      const competenciaVal = record['Competência'] || record['Periodo VA-VT início']?.substring(3) || 'Atual';
+      const dataAtualStr = record['DATA ASSINATURA DO RECIBO'] || new Date().toLocaleDateString('pt-BR');
+
+      const receipt = {
+        id: receiptId,
+        nome: record.NOME,
+        cpf: String(record.CPF),
+        telefone: String(record.TELEFONE || ''),
+        email: record.EMAIL || null,
+        competencia: competenciaVal,
+        status: 'PENDENTE',
+        magicLinkToken: magicToken,
+        createdAt: new Date().toISOString()
+      };
+      
+      db.addReceipt(receipt);
+
+      const formatMoney = (val: any) => {
+        if (typeof val === 'number') {
+          return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
-      });
+        return val ? String(val) : 'R$ 0,00';
+      };
 
-      // 2. Dynamically Generate the Official PDF File 
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([600, 800]);
+      const pdfData = {
+        nome: String(record.NOME || ''),
+        cpf: String(record.CPF || ''),
+        ini: String(record['Periodo VA-VT início'] || ''),
+        fim: String(record['Periodo VA-VT  fim'] || record['Periodo VA-VT fim'] || ''),
+        competencia: String(competenciaVal),
+        dias_uteis: String(record['DIAS ÚTEIS'] || '0'),
+        valor_unitario_va: formatMoney(record['VALOR UNITÁRIO ALIMENTAÇÃO']),
+        valor_unitario_vt: formatMoney(record['VALOR UNITÁRIO VALE TRANSPORTE']),
+        va_receita: formatMoney(record['VALOR PAGO VA'] || record['VALE ALIMENTAÇÃO']),
+        vt_receita: formatMoney(record['VALOR PAGO VT'] || record['VALE TRANSPORTE']),
+        dias_descontados: String(record['DIAS DESCONTADO'] || '0'),
+        va_despesa: formatMoney(record['VALOR DESCONTADO VA'] || record['VALE ALIMENTAÇÃO (DESCONTO POR FALTA E ATESTADO)']),
+        vt_despesa: formatMoney(record['VALOR DESCONTADO VT'] || record['VALE TRANSPORTE (DESCONTO POR FALTA E ATESTADO)']),
+        valor_liquido_depositado_va: formatMoney(record['VALOR LÍQUIDO DEPOSITADO VA']),
+        valor_liquido_depositado_vt: formatMoney(record['VALOR LÍQUIDO DEPOSITADO VT']),
+        obs: String(record['Observação'] || record['OBSERVACAO'] || ''),
+        data_atual: String(dataAtualStr)
+      };
 
-      // Draw the design (This is a generic placeholder design for the ticket)
-      page.drawText('RECIBO DE BENEFÍCIOS - GREEN HOUSE', { x: 50, y: 750, size: 20, color: rgb(0, 0.5, 0) });
-      page.drawText(`Colaborador: ${receipt.nome} | CPF: ${receipt.cpf}`, { x: 50, y: 700, size: 12 });
-      
-      const calcVA = receipt.va_valor * (receipt.dias_uteis - receipt.dias_desconto);
-      const calcVT = receipt.vt_valor * (receipt.dias_uteis - receipt.dias_desconto);
+      const pdfBytes = await generateReceiptPDF(pdfData);
 
-      page.drawText(`Competência: ${receipt.competencia}`, { x: 50, y: 650, size: 14 });
-      page.drawText(`Vale Alimentação Total: R$ ${calcVA.toFixed(2)}`, { x: 50, y: 620, size: 14 });
-      page.drawText(`Vale Transporte Total: R$ ${calcVT.toFixed(2)}`, { x: 50, y: 590, size: 14 });
-      
-      if (receipt.observacao) {
-        page.drawText(`Observação de Desconto: ${receipt.observacao}`, { x: 50, y: 540, size: 12, color: rgb(0.8, 0, 0) });
-      }
-
-      page.drawText('Status da Assinatura: AGUARDANDO ASSINATURA ELETRÔNICA', { x: 50, y: 400, size: 12 });
-      page.drawText(`Autenticação Link Único: ${receipt.magicLinkToken}`, { x: 50, y: 380, size: 8, color: rgb(0.5, 0.5, 0.5) });
-
-      // Save PDF to volume
-      const pdfBytes = await pdfDoc.save();
-      const pdfPath = path.join(uploadsDir, `${receipt.id}.pdf`);
+      const pdfPath = path.join(uploadsDir, `${receiptId}.pdf`);
       fs.writeFileSync(pdfPath, pdfBytes);
 
-      // Update the DB record with path
-      await prisma.receipt.update({
-        where: { id: receipt.id },
-        data: { pdfOriginalPath: pdfPath }
-      });
+      db.updateReceipt(receiptId, { pdfOriginalPath: pdfPath });
+
+      logger.info(`PDF Oficial gerado para CPF: ${receipt.cpf}`, { id: receipt.id });
 
       successCount++;
     }
 
+    logger.info(`Lote processado com sucesso. Registros: ${successCount}`);
     return NextResponse.json({ success: true, count: successCount }, { status: 200 });
   } catch (error: any) {
+    logger.error('Erro catastrofico ao processar e gerar PDFs', { error: String(error) });
     console.error('Erro ao processar e gerar Pdfs:', error);
-    return NextResponse.json({ error: 'Falha processando base do Excel.', details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: 'Falha processando base do Excel.', details: String(error), hint: error.stack }, { status: 500 });
   }
 }

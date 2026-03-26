@@ -1,34 +1,33 @@
-# GreenHouse - Portal de Benefícios 🍃
+# GreenHouse - Plataforma Operacional de Benefícios 🍃 (V2)
 
-Um portal moderno para gestão corporativa de benefícios e automação de assinaturas eletrônicas com validade jurídica (VA/VT). 
-Desenvolvido com o poder da Stack **Next.js 14, TailwindCSS, Prisma (SQLite) e PDF-lib**, arquitetado sob containerização pura em **Docker** (para VPS/Portainer).
+A aplicação definitiva para gestão corporativa de benefícios (VA/VT) e emissão de contratos/recibos em massa para o Departamento Pessoal. Construída puramente sob os rigores de automação e performance para substituir processos ineficientes.
 
-## 🗂 Estrutura do Projeto
+## 🚀 Novidades na V2 (Versão Atual)
 
-Este projeto é independente e não usa mais gambiarras como o "n8n com Google Sheets". Tudo foi internalizado na aplicação garantindo estabilidade e registro legal das rotinas.
+- **UI/UX Dark Mode Premium:** Frontend completamente re-arquitetado. Abandonamos o design corporativo em favor de um dashboard futurista inspirado em portfólios *Awwwards*, utilizando recursos avançados de TailwindCSS (Mesh gradients, Glassmorphism denso, grids neon).
+- **Motor PDF 'Contracheque':** O gerador de PDFs original (Folha A4 inteira) foi otimizado para um padrão compacto (meia-folha A5 em Paisagem) semelhante a um holerite de pagamento. Inclui justificação matemática de parágrafos declaratórios e injeção automática de **Logo Customizado**.
+- **Fórmulas Nativas de Excel:** O template de ingestão baixado pela plataforma agora possui processamento matemático nas células (`=E2*F2`), poupando o RH de preencher dados multiplicativos à mão. O backend possui inteligência de casting (conversão para BRL local `R$`) para os resultados gerados pelo motor do Excel.
+- **Banco de Dados Zero-Friction & Auto-Cleanup:** O Prisma/SQLite foi desligado para evitar panes de permissões de binários no Docker Windows. Arquitetamos um micro-banco NoSQL local em arquivo JSON. 
+  - **Lixeira Ativa:** Ao gerar novos lotes, o sistema varre e exclui automaticamente PDFs físicos com mais de 30 dias de idade. 
+  - **Granularidade:** Exclusão individual de recibos agora permitida via UI.
 
-- **Frontend:** Next.js Server Components e React com uma interface *Glassmorphism* limpa desenvolvida para Mobile-First (RH pode aprovar pelo celular).
-- **Backend APIs:**
-  - `POST /api/upload`: Leitura assíncrona da planilha de benefícios via `xlsx`.
-  - `GET /api/template`: Geração instantânea do arquivo modelo obrigatório do Departamento Pessoal.
-  - `POST /api/process`: Inserções ACID no banco SQLite e montagem em tempo-real dos arquivos `.pdf` oficiais a serem assinados.
-- **Log System:** Todos os passos, falhas e melhorias da AI são rastreados nativamente na pasta `logs/`.
+## 🗂 Estrutura Técnica
+- **Frontend:** Next.js Server Components, React 18, Tailwind.
+- **Geração PDF:** *pdf-lib* em buffer de memória.
+- **Processamento:** *xlsx* bufferizado.
 
-## 🚀 Como Rodar Localmente (Desenvolvimento)
+## 💻 Como Rodar (Ambiente Docker Local)
 
-Abra o terminal na pasta `app-beneficios` e rode:
+O projeto está encapsulado. Apenas rode o comando abaixo na raiz:
 ```bash
-docker-compose -f docker-compose.local.yml up -d
+docker-compose -f docker-compose.local.yml up -d --build
 ```
-> O volume espelhará o código ao vivo (Hot-Reload) em http://localhost:3000
+> Acesse `http://localhost:3000`. 
+> Lembre-se de colocar sua logo como `logo.png` dentro da pasta `public/` caso deseje o cabeçalho impresso oficial nos holerites gerados.
 
-## 📦 Deploy para Produção (VPS via Portainer)
+## 🌟 RoadMap (Próximos Passos - V3)
+1. Conectar a plataforma ao disparador do **Evolution API (WhatsApp)** e enviar os *Magic Links* aos colaboradores individualmente com apenas 1 clique no painel Dark Mode.
+2. Tela receptora do Colaborador *Mobile-First*, onde ele abre o link e assina o PDF na tela do próprio celular nativamente usando tecnologia Web Canvas.
+3. Carimbo digital do hash da assinatura no PDF físico gerado e salvo por nós.
 
-Apenas copie o conteúdo do `docker-compose.yml` da raiz e use no Portainer (Add Stack). Ele construirá a aplicação a partir do `Dockerfile` multi-stage que compila o Prisma e otimiza a imagem em Alpine Linux.
-
-## 🌟 Funcionalidades
-1. **Modelos Exatos:** Você não precisa adivinhar o formato do Excel da folha. Baixe o modelo dinâmico no App.
-2. **Logs Transparentes:** Problemas ao ler linhas do Excel? O sistema te diz onde estão de maneira instantânea e guarda isso em Logs.
-3. **Assinatura Autônoma (Em breve):** Em vez de Gov.br, o colaborador usa nosso painel touch-friendly pelo Evolution API no Whatsapp. O IP dele é chancelado.
-
-_Desenvolvido sob o fluxo BMAD com os times de Arquitetura, UX e Desenvolvimento._
+_Produzido pela Equipe BMAD via IA Autônoma._
