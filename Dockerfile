@@ -2,11 +2,11 @@ FROM node:20-alpine AS base
 
 # Dependências
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Build
 FROM base AS builder
@@ -14,6 +14,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+RUN npx prisma generate
 RUN npm run build
 
 # Imagem de produção
