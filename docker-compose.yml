@@ -15,7 +15,7 @@ services:
       - default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.greenhouse-beneficios.rule=Host(`beneficios.unibot.com.br`)"
+      - "traefik.http.routers.greenhouse-beneficios.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.greenhouse-beneficios.entrypoints=websecure"
       - "traefik.http.routers.greenhouse-beneficios.tls.certresolver=letsencrypt" # Ou nome do seu resolver
       - "traefik.http.services.greenhouse-beneficios.loadbalancer.server.port=3000"
@@ -24,7 +24,7 @@ services:
       - greenhouse_uploads:/app/uploads
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_BASE_URL=https://beneficios.unibot.com.br
+      - NEXT_PUBLIC_BASE_URL=https://${DOMAIN}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
