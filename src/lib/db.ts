@@ -60,6 +60,15 @@ export const db = {
     });
     fs.writeFileSync(dbPath, JSON.stringify(keptReceipts, null, 2));
   },
+  addDisparo: (id: string, disparo: { canal: 'whatsapp' | 'email'; data: string; status: 'sucesso' | 'erro'; detalhes?: string }) => {
+    const receipts = db.getReceipts();
+    const index = receipts.findIndex((r: any) => r.id === id);
+    if (index !== -1) {
+      if (!receipts[index].disparos) receipts[index].disparos = [];
+      receipts[index].disparos.push(disparo);
+      fs.writeFileSync(dbPath, JSON.stringify(receipts, null, 2));
+    }
+  },
   deleteReceipt: (id: string) => {
     const receipts = db.getReceipts();
     const keptReceipts = receipts.filter((r: any) => {

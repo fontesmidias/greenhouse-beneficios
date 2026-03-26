@@ -57,3 +57,30 @@
 [2026-03-26T02:04:52.975Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
 [2026-03-26T02:04:56.333Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"e03cd40e-2996-41eb-a774-81fdad7db835"}
 [2026-03-26T02:04:56.352Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T02:24:25.566Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10065 bytes) 
+[2026-03-26T02:24:25.680Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T02:24:44.984Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"401902af-d7f1-4fa7-a977-bcf519eb8671"}
+[2026-03-26T02:24:44.998Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T02:31:22.644Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10065 bytes) 
+[2026-03-26T02:31:22.803Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T02:31:26.510Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"6d8ef374-eb35-4a6f-bc49-1f572c73e8c9"}
+[2026-03-26T02:31:26.520Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T02:40:26.214Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10065 bytes) 
+[2026-03-26T02:40:26.336Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T02:40:33.203Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"d3cccecb-e02b-4cee-9197-ae81835dd9ba"}
+[2026-03-26T02:40:33.209Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T02:51:29.098Z] [INFO] Email de confirmação de assinatura enviado para cery00@gmail.com 
+[2026-03-26T03:08:02.534Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10065 bytes) 
+[2026-03-26T03:08:02.735Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T03:08:06.047Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"32180859-0dc5-42f8-a7e2-9f1125eca377"}
+[2026-03-26T03:08:06.062Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T03:13:22.152Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10048 bytes) 
+[2026-03-26T03:13:22.175Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T03:13:24.488Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"e3ba41ac-130e-4da0-86e9-7e41e15c202e"}
+[2026-03-26T03:13:24.495Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T03:14:03.802Z] [INFO] Email de confirmação de assinatura enviado para cery00@gmail.com 
+[2026-03-26T03:15:43.397Z] [INFO] Iniciando leitura do arquivo Excel: Template_Beneficios_Oficial (2).xlsx (10048 bytes) 
+[2026-03-26T03:15:43.711Z] [INFO] Planilha lida validada com sucesso. Colaboradores: 1 {"file":"Template_Beneficios_Oficial (2).xlsx"}
+[2026-03-26T03:15:47.959Z] [INFO] PDF Oficial gerado para CPF: 111.222.333-44 {"id":"e8ed2788-0bed-4030-a03f-9a3d353c9d34"}
+[2026-03-26T03:15:47.965Z] [INFO] Lote processado com sucesso. Registros: 1 
+[2026-03-26T03:16:28.060Z] [INFO] Email de confirmação de assinatura enviado para cery00@gmail.com 

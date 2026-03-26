@@ -125,54 +125,40 @@ export async function generateReceiptPDF(data: any): Promise<Uint8Array> {
   drawLine(-5, 1);
   cursorY -= 20;
 
-  // --- TEXTO JUSTIFICADO ---
+  // --- TEXTO ALINHADO À ESQUERDA (Com word-wrap simples) ---
   const declaration = `Eu, ${data.nome}, recebi a quantia discriminada acima, da Empresa GREEN HOUSE SERVIÇOS DE LOCAÇÃO DE MÃO DE OBRA LTDA, para minha utilização no período indicado.`;
   
-  // Custom Justification Algorithm
   const maxW = width - margin * 2;
   const words = declaration.split(' ');
-  let lineWords: string[] = [];
-  let currentLineWidth = 0;
+  let currentLine = '';
   
   for (const word of words) {
-    const wordW = helvetica.widthOfTextAtSize(word, 9);
-    const spaceW = helvetica.widthOfTextAtSize(' ', 9);
-    if (currentLineWidth + wordW + spaceW > maxW && lineWords.length > 0) {
-      // Draw justified line
-      const totalWordsWidth = lineWords.reduce((sum, w) => sum + helvetica.widthOfTextAtSize(w, 9), 0);
-      const gapToFill = maxW - totalWordsWidth;
-      const spaceSize = lineWords.length > 1 ? gapToFill / (lineWords.length - 1) : 0;
-      
-      let xOffset = margin;
-      for (let i = 0; i < lineWords.length; i++) {
-        page.drawText(lineWords[i], { x: xOffset, y: cursorY, size: 9, font: helvetica, color: rgb(0, 0, 0) });
-        xOffset += helvetica.widthOfTextAtSize(lineWords[i], 9) + spaceSize;
-      }
+    const testLine = currentLine === '' ? word : `${currentLine} ${word}`;
+    const testWidth = helvetica.widthOfTextAtSize(testLine, 9);
+    if (testWidth > maxW) {
+      page.drawText(currentLine, { x: margin, y: cursorY, size: 9, font: helvetica, color: rgb(0, 0, 0) });
       cursorY -= 12;
-      lineWords = [word];
-      currentLineWidth = wordW;
+      currentLine = word;
     } else {
-      lineWords.push(word);
-      currentLineWidth += wordW + (lineWords.length > 1 ? spaceW : 0);
+      currentLine = testLine;
     }
   }
-  // Draw remaining line without justification
-  if (lineWords.length > 0) {
-    page.drawText(lineWords.join(' '), { x: margin, y: cursorY, size: 9, font: helvetica, color: rgb(0, 0, 0) });
+  if (currentLine !== '') {
+    page.drawText(currentLine, { x: margin, y: cursorY, size: 9, font: helvetica, color: rgb(0, 0, 0) });
     cursorY -= 16;
   }
 
   if (data.obs && data.obs.trim() !== '' && data.obs !== 'Sem observações') {
     drawText(`Observação: ${data.obs}`, helvetica, 8, margin);
-    cursorY -= 16;
   }
 
-  cursorY -= 25;
+  // --- FIXED BOTTOM BLOCK ---
+  cursorY = 90;
   
   // --- CENTERED DATE ---
   drawText(`Brasília - DF,  ${data.data_atual}.`, helvetica, 10, margin, true, maxW);
   
-  cursorY -= 40;
+  cursorY = 50; 
   // --- SIGNATURE LINE ---
   drawText('__________________________________________________________', helvetica, 10, margin, true, maxW);
   cursorY -= 12;

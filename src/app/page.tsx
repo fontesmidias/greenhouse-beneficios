@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
   const [parsedRecords, setParsedRecords] = useState<any[]>([]);
   const [lots, setLots] = useState<any[]>([]);
@@ -13,6 +14,9 @@ export default function Home() {
   // Sorting state for the Tracker Table
   const [sortKey, setSortKey] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Selection state for Row Checkboxes
+  const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
 
   const fetchLots = async () => {
     try {
@@ -35,6 +39,7 @@ export default function Home() {
     try {
       await fetch(`/api/receipts?competencia=${encodeURIComponent(comp)}`, { method: 'DELETE' });
       fetchLots();
+      setSelectedReceipts([]); // Clear selection just in case
     } catch(e) {}
   };
 
@@ -43,6 +48,7 @@ export default function Home() {
     try {
       await fetch(`/api/receipts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       fetchLots();
+      setSelectedReceipts(prev => prev.filter(x => x !== id));
     } catch(e) {}
   };
 
@@ -135,6 +141,49 @@ export default function Home() {
     }
   };
 
+  // Checkbox Logistics
+  const toggleSelection = (id: string) => {
+    setSelectedReceipts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSelectAll = (lotIds: string[]) => {
+    const allSelected = lotIds.every(id => selectedReceipts.includes(id));
+    if (allSelected) {
+      setSelectedReceipts(prev => prev.filter(id => !lotIds.includes(id)));
+    } else {
+      setSelectedReceipts(prev => Array.from(new Set([...prev, ...lotIds])));
+    }
+  };
+
+  // Universal Dispatch Endpoint
+  const executeDispatch = async (ids: string[], channels: string[]) => {
+    if (ids.length === 0) { alert('Selecione pelo menos 1 recibo marcando a caixa.'); return; }
+    
+    setDispatching(true);
+    setFeedback({ type: 'warning', text: `Disparando via ${channels.join('/')} para ${ids.length} contatos...` });
+    
+    try {
+      const res = await fetch('/api/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptIds: ids, channels })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Erro Crítico no Gateway de Mensageria');
+      if (data.failures && data.failures.length > 0) {
+        setFeedback({ type: 'warning', text: `Disparo concluído: Sucesso: ${data.count}. Falhas: ${data.failures.length} (Contato Vazio ou Erro)` });
+      } else {
+        setFeedback({ type: 'success', text: `🚀 Disparo Total Concluído! ${data.count} notificações enviadas com sucesso.` });
+      }
+      setSelectedReceipts([]); // Clear selection after successful dispatch
+      fetchLots(); // Refresh to see statuses
+    } catch (e: any) {
+      setFeedback({ type: 'error', text: e.message });
+    } finally {
+      setDispatching(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#070708] text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200 pb-10">
       
@@ -157,6 +206,21 @@ export default function Home() {
       </header>
 
       <main className="max-w-[1400px] w-full mx-auto p-4 md:p-8 space-y-8 mt-4">
+        
+        {/* GLOBAL FEEDBACK TOASTER */}
+        {feedback && (
+          <div className={`fixed bottom-10 right-10 z-50 p-6 rounded-2xl text-sm font-bold flex items-center gap-4 backdrop-blur-3xl border shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all animate-bounce-slow
+            ${feedback.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-emerald-500/10' : 
+              feedback.type === 'warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-amber-500/10' : 
+              'bg-rose-500/10 text-rose-400 border-rose-500/30 shadow-rose-500/10'}`}>
+            {feedback.type === 'success' ? '✨ ' : feedback.type === 'warning' ? '⏳ ' : '⚠️ '}
+            {feedback.text}
+            <button onClick={() => setFeedback(null)} className="ml-4 p-1 hover:bg-white/10 rounded-full transition-colors opacity-50 hover:opacity-100">
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* LEFTSIDE: UPLOAD AREA */}
@@ -173,13 +237,6 @@ export default function Home() {
               </div>
               <p className="text-zinc-500 text-xs mb-8 font-medium leading-relaxed">Arraste a planilha do Departamento Pessoal (XLSX). O motor processará regras e criará os contratos digitais.</p>
               
-              {feedback && (
-                <div className={`mb-6 p-4 rounded-2xl text-xs font-bold flex items-center gap-3 backdrop-blur-md border ${feedback.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
-                  {feedback.type === 'success' ? '✨ ' : '⚠️ '}
-                  {feedback.text}
-                </div>
-              )}
-
               {parsedRecords && parsedRecords.length > 0 ? (
                 <div className="flex flex-col items-center bg-[#0C0C0E] border border-white/10 rounded-3xl p-6 text-center shadow-inner relative overflow-hidden">
                   <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-30"></div>
@@ -202,10 +259,10 @@ export default function Home() {
                     </ul>
                   </div>
 
-                  <button onClick={processAndDispatch} disabled={processing} className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#070708] font-bold py-3.5 px-6 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all active:scale-95 disabled:opacity-50">
+                  <button onClick={processAndDispatch} disabled={processing || dispatching} className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#070708] font-bold py-3.5 px-6 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all active:scale-95 disabled:opacity-50">
                     {processing ? 'Sintetizando...' : 'Compilar Documentos (PDF)'}
                   </button>
-                  <button onClick={() => setParsedRecords([])} disabled={processing} className="mt-5 text-xs text-zinc-600 font-bold hover:text-white transition-colors uppercase tracking-widest">Descartar Lote</button>
+                  <button onClick={() => setParsedRecords([])} disabled={processing || dispatching} className="mt-5 text-xs text-zinc-600 font-bold hover:text-white transition-colors uppercase tracking-widest">Descartar Lote</button>
                 </div>
               ) : (
                 <label 
@@ -220,7 +277,7 @@ export default function Home() {
                     <p className="text-sm font-bold text-zinc-300">Drop Zone (XLSX, CSV)</p>
                     <p className="text-xs font-medium text-zinc-600 mt-2">Arraste a base para a nuvem</p>
                   </div>
-                  <input type="file" className="hidden" accept=".xlsx, .csv" onChange={handleFileUpload} disabled={uploading} />
+                  <input type="file" className="hidden" accept=".xlsx, .csv" onChange={handleFileUpload} disabled={uploading || dispatching} />
                 </label>
               )}
             </div>
@@ -232,7 +289,7 @@ export default function Home() {
               <div className="flex justify-between items-end mb-8 relative z-10">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-tight">Monitor de Operações</h2>
-                  <p className="text-zinc-500 text-xs font-medium mt-1">Acervo de Documentos e Envio via Evolution API.</p>
+                  <p className="text-zinc-500 text-xs font-medium mt-1">Acervo de Documentos e Envio via Mensageria (Evo / SMTP).</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={fetchLots} className="p-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all border border-white/5" title="Recarregar">
@@ -241,7 +298,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-hidden flex flex-col rounded-3xl bg-[#09090B] ring-1 ring-white/5 z-10">
+              <div className="flex-1 overflow-hidden flex flex-col rounded-3xl bg-[#09090B] ring-1 ring-white/5 z-10 w-full">
                 {lots.length === 0 ? (
                    <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 p-12">
                      <div className="w-16 h-16 bg-[#161618] rounded-2xl flex items-center justify-center mb-4 ring-1 ring-white/5">
@@ -251,72 +308,110 @@ export default function Home() {
                      <p className="text-xs mt-1">Suba um lote para criar contratos</p>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
-                    {lots.map((lot, idx) => (
-                      <div key={idx} className="bg-[#141416] ring-1 ring-white/5 rounded-[1.25rem] overflow-hidden group">
+                  <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar p-3 space-y-4 w-full">
+                    {lots.map((lot, idx) => {
+                       const lotRowIds = lot.receipts.map((r:any) => r.id);
+                       const selectedInLot = lotRowIds.filter((id:any) => selectedReceipts.includes(id));
+                       
+                       return (
+                      <div key={idx} className="bg-[#141416] ring-1 ring-white/5 rounded-[1.25rem] overflow-hidden group min-w-[600px] lg:min-w-0">
                         
                         {/* LOT HEADER */}
-                        <div className="px-6 py-4 flex justify-between items-center bg-gradient-to-r from-white/[0.03] to-transparent border-b border-white/5">
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                               <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
-                               <h3 className="text-xs font-bold text-white uppercase tracking-widest leading-none">CMPT {lot.competencia}</h3>
+                        <div className="px-5 py-3.5 flex flex-col md:flex-row gap-4 justify-between items-center bg-gradient-to-r from-white/[0.03] to-transparent border-b border-white/5">
+                          <div className="flex gap-4 items-center w-full md:w-auto">
+                            <input 
+                              type="checkbox" 
+                              checked={lotRowIds.length > 0 && selectedInLot.length === lotRowIds.length} 
+                              onChange={() => toggleSelectAll(lotRowIds)} 
+                              className="accent-emerald-500 w-4 h-4 rounded ring-1 ring-white/20 bg-[#070708] border-none cursor-pointer" 
+                              title="Selecionar Lote Inteiro"
+                            />
+                            <div>
+                               <div className="flex items-center gap-3 mb-0.5">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
+                                 <h3 className="text-[11px] font-bold text-white uppercase tracking-widest leading-none">CMPT {lot.competencia}</h3>
+                               </div>
+                               <span className="text-[9px] font-medium text-zinc-500">{selectedInLot.length} de {lot.total} selecionados</span>
                             </div>
-                            <span className="text-[10px] font-medium text-zinc-500 pl-5">{lot.total} assinaturas pendentes</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                             <button onClick={() => deleteLot(lot.competencia)} className="text-[10px] bg-rose-500/10 text-rose-500 hover:text-rose-400 ring-1 ring-rose-500/20 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-500/20 transition-all uppercase tracking-wide" title="Purgar Lixo">
+                          
+                          <div className="flex flex-wrap items-center gap-2">
+                             <button onClick={() => deleteLot(lot.competencia)} disabled={dispatching} className="text-[9px] bg-rose-500/10 text-rose-500 hover:text-rose-400 ring-1 ring-rose-500/20 font-bold px-2.5 py-1.5 rounded-lg hover:bg-rose-500/20 transition-all uppercase tracking-wide disabled:opacity-50" title="Purgar Lixo">
                                 Excluir Lote
                              </button>
-                            <button className="text-[10px] bg-white text-black font-bold px-4 py-1.5 rounded-lg hover:bg-zinc-200 transition-colors uppercase tracking-wide shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                              Executar Disparo
+                             <button onClick={() => executeDispatch(selectedInLot, ['email'])} disabled={selectedInLot.length === 0 || dispatching} className={`text-[9px] bg-[#1C1C1F] ring-1 ring-white/10 hover:bg-white/10 text-zinc-300 font-bold px-3 py-1.5 rounded-lg transition-all uppercase tracking-wide flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`} title="Disparar Email para Selecionados">
+                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                               Massa Email
+                             </button>
+                            <button onClick={() => executeDispatch(selectedInLot, ['whatsapp'])} disabled={selectedInLot.length === 0 || dispatching} className={`text-[9px] bg-[#1C1C1F] ring-1 ring-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 font-bold px-3 py-1.5 rounded-lg transition-all uppercase tracking-wide flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`} title="Disparar WhatsApp para Selecionados">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                              Massa WA
                             </button>
                           </div>
                         </div>
                         
                         {/* TABLE */}
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse">
+                        <div className="overflow-x-auto w-full custom-scrollbar">
+                          <table className="w-full text-left border-collapse table-auto">
                             <thead>
-                              <tr className="bg-[#0A0A0B] text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
-                                <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors group/th" onClick={() => handleSort('nome')}>
+                              <tr className="bg-[#0A0A0B] text-[9px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                                <th className="px-4 py-2.5 w-8">SEL</th>
+                                <th className="px-4 py-2.5 cursor-pointer hover:text-white transition-colors group/th min-w-[150px]" onClick={() => handleSort('nome')}>
                                   Colaborador <span className="opacity-0 group-hover/th:opacity-100 transition-opacity">{sortKey === 'nome' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}</span>
                                 </th>
-                                <th className="px-6 py-3 cursor-pointer hover:text-white transition-colors group/th" onClick={() => handleSort('cpf')}>
-                                  Identificação <span className="opacity-0 group-hover/th:opacity-100 transition-opacity">{sortKey === 'cpf' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                <th className="px-4 py-2.5 cursor-pointer hover:text-white transition-colors group/th hidden sm:table-cell" onClick={() => handleSort('cpf')}>
+                                  CPF <span className="opacity-0 group-hover/th:opacity-100 transition-opacity">{sortKey === 'cpf' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}</span>
                                 </th>
-                                <th className="px-6 py-3">Timestamp / Ingestão</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3 text-right">Ações</th>
+                                <th className="px-4 py-2.5 hidden md:table-cell">Ingestão</th>
+                                <th className="px-4 py-2.5">Histórico</th>
+                                <th className="px-4 py-2.5">Status</th>
+                                <th className="px-4 py-2.5 text-right">Ações</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                               {sortReceipts(lot.receipts).map((rec: any, rIdx: number) => (
-                                <tr key={rIdx} className="hover:bg-white/[0.02] transition-colors group/row">
-                                  <td className="px-6 py-3.5 font-bold text-zinc-200 text-xs whitespace-nowrap">{rec.nome}</td>
-                                  <td className="px-6 py-3.5 font-mono text-zinc-500 text-[11px]">{rec.cpf}</td>
-                                  <td className="px-6 py-3.5 text-zinc-500 text-[10px] font-medium font-mono">
+                                <tr key={rIdx} className="hover:bg-white/[0.04] transition-colors group/row">
+                                  <td className="px-4 py-3">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={selectedReceipts.includes(rec.id)} 
+                                      onChange={() => toggleSelection(rec.id)} 
+                                      className="accent-emerald-500 w-3.5 h-3.5 rounded ring-1 ring-white/20 bg-[#070708] border-none cursor-pointer" 
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 font-bold text-zinc-200 text-[11px] truncate max-w-[150px]">{rec.nome}</td>
+                                  <td className="px-4 py-3 font-mono text-zinc-500 text-[10px] hidden sm:table-cell">{rec.cpf}</td>
+                                  <td className="px-4 py-3 text-zinc-600 text-[9px] font-medium font-mono hidden md:table-cell">
                                     {new Date(rec.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                                   </td>
-                                  <td className="px-6 py-3.5">
+                                  <td className="px-4 py-3">
+                                    <div className="flex gap-1 flex-wrap">
+                                      {rec.disparos && rec.disparos.length > 0 ? rec.disparos.map((d: any, idx: number) => (
+                                        <span key={idx} className={`px-1.5 py-0.5 text-[8px] rounded uppercase font-bold tracking-widest ${d.status === 'sucesso' ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20' : 'bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20'}`} title={`${new Date(d.data).toLocaleString()} - ${d.detalhes || d.status}`}>
+                                          {d.canal === 'whatsapp' ? 'WA' : 'MAIL'}
+                                        </span>
+                                      )) : <span className="text-[10px] text-zinc-800 italic">...</span>}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
                                     <div className="flex items-center">
-                                      <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded-md ring-1 ${rec.status === 'ASSINADO' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-400 ring-amber-500/20'}`}>
+                                      <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest rounded-md ring-1 ${rec.status === 'ASSINADO' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-400 ring-amber-500/20'}`}>
                                         {rec.status}
                                       </span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-3.5 flex gap-1.5 justify-end opacity-20 group-hover/row:opacity-100 transition-opacity">
-                                    <a href={`/api/download?id=${rec.id}`} target="_blank" className="p-1.5 bg-[#1C1C1F] ring-1 ring-white/10 hover:ring-white/30 text-zinc-400 hover:text-white rounded-lg transition-all" title="Baixar Contrato Secundário">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                  <td className="px-4 py-3 flex gap-1 justify-end">
+                                    <button onClick={() => executeDispatch([rec.id], ['email'])} disabled={dispatching} className="p-1 bg-[#1C1C1F] ring-1 ring-white/10 hover:ring-white/30 text-zinc-400 hover:text-white rounded-lg transition-all disabled:opacity-50" title="Email">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                    </button>
+                                    <button onClick={() => executeDispatch([rec.id], ['whatsapp'])} disabled={dispatching} className="p-1 bg-[#1C1C1F] ring-1 ring-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 rounded-lg transition-all disabled:opacity-50" title="WhatsApp">
+                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                    </button>
+                                    <a href={`/api/download?id=${rec.id}`} download target="_blank" className="p-1 bg-[#1C1C1F] ring-1 ring-sky-500/20 hover:bg-sky-500/10 text-sky-400 hover:text-sky-300 rounded-lg transition-all" title="Baixar Arquivo PDF Físico">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                     </a>
-                                    <button className="p-1.5 bg-[#1C1C1F] ring-1 ring-white/10 hover:ring-white/30 text-zinc-400 hover:text-white rounded-lg transition-all" title="Ping via Email">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                                    </button>
-                                    <button className="p-1.5 bg-[#1C1C1F] ring-1 ring-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 rounded-lg transition-all" title="Disparar Protocolo Whatsapp">
-                                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766 0 1.01.272 1.996.827 2.842l-1.077 3.931 4.027-1.056c.801.5 1.706.772 2.656.772 3.181 0 5.768-2.586 5.768-5.766 0-3.181-2.586-5.767-5.768-5.767zm3.392 8.28c-.142-.401-.844-.954-1.583-1.258-.093-.038-.16-.057-.229.043-.068.1-.229.3-.393.447-.164.148-.328.163-.483.056-.913-.631-1.614-1.127-2.318-2.18-.111-.166.024-.265.175-.487.051-.074.1-.166.151-.25.051-.082.025-.152-.001-.25-.025-.1-.328-.79-.448-1.082-.119-.283-.241-.245-.331-.25-.088-.004-.189-.004-.29-.004s-.266.038-.405.188c-.139.15-5.32 5.097-5.32 8.814 0 3.717 3.238 6.556 5.688 8.355 2.45 1.799 4.398 2.052 5.965 1.703 1.567-.348 2.373-.974 2.665-1.921.291-.947.291-1.761.205-1.933-.087-.171-.32-.275-.623-.427z"/></svg>
-                                    </button>
-                                    <button onClick={() => deleteReceipt(rec.id, rec.nome)} className="p-1.5 ml-2 bg-[#1C1C1F] ring-1 ring-rose-500/20 hover:bg-rose-500/10 text-rose-500 hover:text-rose-400 rounded-lg transition-all" title="Expurgar do Sistema">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    <button onClick={() => deleteReceipt(rec.id, rec.nome)} disabled={dispatching} className="p-1 bg-[#1C1C1F] ring-1 ring-rose-500/20 hover:bg-rose-500/10 text-rose-500 hover:text-rose-400 rounded-lg transition-all disabled:opacity-50" title="Apagar">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                     </button>
                                   </td>
                                 </tr>
@@ -325,7 +420,7 @@ export default function Home() {
                           </table>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
               </div>

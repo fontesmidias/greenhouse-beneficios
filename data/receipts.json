@@ -1,1 +1,177 @@
-[]
+[
+  {
+    "id": "401902af-d7f1-4fa7-a977-bcf519eb8671",
+    "nome": "JOAO DA SILVA",
+    "cpf": "111.222.333-44",
+    "telefone": "",
+    "email": null,
+    "competencia": "05/2026",
+    "status": "PENDENTE",
+    "magicLinkToken": "3f4cef19-87d9-461d-be3a-21ddfd0c6daa",
+    "createdAt": "2026-03-26T02:24:44.544Z",
+    "pdfOriginalPath": "/app/uploads/401902af-d7f1-4fa7-a977-bcf519eb8671.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:30:04.338Z",
+        "status": "erro",
+        "detalhes": "Destinatário sem contatos"
+      },
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:30:10.508Z",
+        "status": "erro",
+        "detalhes": "Destinatário sem contatos"
+      }
+    ]
+  },
+  {
+    "id": "6d8ef374-eb35-4a6f-bc49-1f572c73e8c9",
+    "nome": "JOAO DA SILVA",
+    "cpf": "111.222.333-44",
+    "telefone": "",
+    "email": null,
+    "competencia": "05/2026",
+    "status": "PENDENTE",
+    "magicLinkToken": "72516446-04e8-4148-b233-05df0f1125a5",
+    "createdAt": "2026-03-26T02:31:25.889Z",
+    "pdfOriginalPath": "/app/uploads/6d8ef374-eb35-4a6f-bc49-1f572c73e8c9.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:31:33.772Z",
+        "status": "erro",
+        "detalhes": "Destinatário sem contatos"
+      },
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:31:36.392Z",
+        "status": "erro",
+        "detalhes": "Destinatário sem contatos"
+      },
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:40:15.671Z",
+        "status": "erro",
+        "detalhes": "Destinatário sem contatos"
+      }
+    ]
+  },
+  {
+    "id": "d3cccecb-e02b-4cee-9197-ae81835dd9ba",
+    "nome": "JOAO DA SILVA",
+    "cpf": "111.222.333-44",
+    "telefone": "5561981859046",
+    "email": "cery00@gmail.com",
+    "competencia": "05/2026",
+    "status": "ASSINADO",
+    "magicLinkToken": "9bed23d6-6469-45d8-954e-d2779b5b6a6b",
+    "createdAt": "2026-03-26T02:40:32.725Z",
+    "pdfOriginalPath": "/app/uploads/d3cccecb-e02b-4cee-9197-ae81835dd9ba-signed.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T02:40:41.204Z",
+        "status": "sucesso"
+      },
+      {
+        "canal": "whatsapp",
+        "data": "2026-03-26T02:40:44.895Z",
+        "status": "erro",
+        "detalhes": "Error: Evolution API failed with status 400"
+      },
+      {
+        "canal": "whatsapp",
+        "data": "2026-03-26T02:50:23.075Z",
+        "status": "sucesso"
+      },
+      {
+        "canal": "email",
+        "data": "2026-03-26T03:07:14.736Z",
+        "status": "sucesso"
+      },
+      {
+        "canal": "whatsapp",
+        "data": "2026-03-26T03:07:18.161Z",
+        "status": "sucesso"
+      }
+    ],
+    "assinatura": {
+      "data": "2026-03-26T02:51:23.792Z",
+      "ip": "::ffff:172.19.0.1",
+      "hash": "OWJlZDIzZDYtNjQ2OS00NWQ4LTk1NGUtZDI3NzliNWI2YTZiLTIwMjYtMDMtMjZUMDI6NTE6MjMuNzkyWg=="
+    }
+  },
+  {
+    "id": "32180859-0dc5-42f8-a7e2-9f1125eca377",
+    "nome": "JOAO DA SILVA",
+    "cpf": "111.222.333-44",
+    "telefone": "5561981859046",
+    "email": "cery00@gmail.com",
+    "competencia": "05/2026",
+    "status": "PENDENTE",
+    "magicLinkToken": "a88440c9-dae2-4c24-bbee-e133e0f51bd0",
+    "createdAt": "2026-03-26T03:08:05.561Z",
+    "pdfOriginalPath": "/app/uploads/32180859-0dc5-42f8-a7e2-9f1125eca377.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T03:08:12.918Z",
+        "status": "sucesso"
+      },
+      {
+        "canal": "email",
+        "data": "2026-03-26T03:09:01.204Z",
+        "status": "sucesso"
+      }
+    ]
+  },
+  {
+    "id": "e3ba41ac-130e-4da0-86e9-7e41e15c202e",
+    "nome": "bruno teste",
+    "cpf": "111.222.333-44",
+    "telefone": "5561981859046",
+    "email": "cery00@gmail.com",
+    "competencia": "05/2026",
+    "status": "ASSINADO",
+    "magicLinkToken": "33bd13a7-86c0-4543-92b2-83d1264507f9",
+    "createdAt": "2026-03-26T03:13:24.300Z",
+    "pdfOriginalPath": "/app/uploads/e3ba41ac-130e-4da0-86e9-7e41e15c202e-signed.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T03:13:31.366Z",
+        "status": "sucesso"
+      }
+    ],
+    "assinatura": {
+      "data": "2026-03-26T03:13:58.804Z",
+      "ip": "::ffff:172.19.0.1",
+      "hash": "MzNiZDEzYTctODZjMC00NTQzLTkyYjItODNkMTI2NDUwN2Y5LTIwMjYtMDMtMjZUMDM6MTM6NTguODA0Wg=="
+    }
+  },
+  {
+    "id": "e8ed2788-0bed-4030-a03f-9a3d353c9d34",
+    "nome": "bruno teste",
+    "cpf": "111.222.333-44",
+    "telefone": "5561981859046",
+    "email": "cery00@gmail.com",
+    "competencia": "05/2026",
+    "status": "ASSINADO",
+    "magicLinkToken": "274d632d-452e-4424-a82b-ffbb926902ef",
+    "createdAt": "2026-03-26T03:15:47.508Z",
+    "pdfOriginalPath": "/app/uploads/e8ed2788-0bed-4030-a03f-9a3d353c9d34-signed.pdf",
+    "disparos": [
+      {
+        "canal": "email",
+        "data": "2026-03-26T03:15:56.100Z",
+        "status": "sucesso"
+      }
+    ],
+    "assinatura": {
+      "data": "2026-03-26T03:16:22.297Z",
+      "ip": "::ffff:172.19.0.1",
+      "hash": "Mjc0ZDYzMmQtNDUyZS00NDI0LWE4MmItZmZiYjkyNjkwMmVmLTIwMjYtMDMtMjZUMDM6MTY6MjIuMjk3Wg=="
+    }
+  }
+]
