@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
+import { useSession, signOut } from "next-auth/react";
 export default function Home() {
+  const { data: session } = useSession();
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -202,6 +203,27 @@ export default function Home() {
             <h1 className="text-xl font-bold tracking-tight text-white leading-none">GreenHouse</h1>
             <span className="text-zinc-500 font-medium text-[10px] uppercase tracking-widest mt-1">Plataforma Operacional</span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {session?.user ? (
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-white text-xs font-bold">{session.user.name}</span>
+                <span className="text-emerald-400 text-[9px] font-bold uppercase tracking-widest">{(session.user as any).role || 'STAFF'}</span>
+              </div>
+              <div className="flex gap-2">
+                <a href="/profile" className="w-8 h-8 bg-[#161618] hover:bg-white/10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all ring-1 ring-white/10" title="Meu Perfil">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </a>
+                <button onClick={() => signOut()} className="w-8 h-8 bg-rose-500/10 hover:bg-rose-500/20 rounded-xl flex items-center justify-center text-rose-500 transition-all ring-1 ring-rose-500/20" title="Sair do Cofre">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 animate-pulse">Autenticando...</div>
+          )}
         </div>
       </header>
 
