@@ -27,14 +27,10 @@ services:
         max_attempts: 3
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=unibotnet"
         - "traefik.http.routers.greenhouse-beneficios.rule=Host(`${DOMAIN}`)"
         - "traefik.http.routers.greenhouse-beneficios.entrypoints=websecure"
-        - "traefik.http.routers.greenhouse-beneficios.priority=2"
         - "traefik.http.routers.greenhouse-beneficios.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.greenhouse-beneficios.service=greenhouse-beneficios"
         - "traefik.http.services.greenhouse-beneficios.loadbalancer.server.port=3000"
-        - "traefik.http.services.greenhouse-beneficios.loadbalancer.passHostHeader=true"
 
 volumes:
   greenhouse_data:
