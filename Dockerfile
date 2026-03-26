@@ -29,7 +29,7 @@ COPY --from=builder /app/.next/static ./.next/static
 
 # Injeta a CLI do Prisma e os schemas para rodarmos as migrações na montagem do volume
 COPY --from=builder /app/prisma ./prisma
-RUN npm install -g prisma
+RUN npm install -g prisma@5.22.0
 
 EXPOSE 3000
 
