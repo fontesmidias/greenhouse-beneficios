@@ -36,5 +36,5 @@ EXPOSE 3000
 
 ENV PORT=3000
 
-# Next.js standalone runner com Startup Push
-CMD npx prisma db push && node server.js
+# Next.js standalone runner com Startup Push e Skip Generate (para não quebrar no standalone enxuto)
+CMD npx prisma db push --skip-generate && node server.js
