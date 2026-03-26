@@ -57,7 +57,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">E-mail Corporativo</label>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">E-mail</label>
             <input 
               type="email" 
               value={email}
@@ -93,8 +93,8 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 text-center border-t border-white/5 pt-6">
-          <p className="text-xs text-zinc-500 font-medium">Não possui cadastro no DP?</p>
-          <a href="/register" className="inline-block mt-2 text-sm text-white font-bold hover:text-emerald-400 transition-colors">Solicitar Acesso ao Admin &rarr;</a>
+          <p className="text-xs text-zinc-500 font-medium">Não possui acesso ao Portal?</p>
+          <a href="/register" className="inline-block mt-2 text-sm text-white font-bold hover:text-emerald-400 transition-colors">Solicitar Acesso &rarr;</a>
         </div>
       </div>
     </div>

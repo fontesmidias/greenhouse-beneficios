@@ -27,9 +27,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# Injeta a CLI do Prisma e os schemas para rodarmos as migrações na montagem do volume
+COPY --from=builder /app/prisma ./prisma
+RUN npm install -g prisma
+
 EXPOSE 3000
 
 ENV PORT=3000
 
-# Next.js standalone runner
-CMD ["node", "server.js"]
+# Next.js standalone runner com Startup Push
+CMD npx prisma db push && node server.js

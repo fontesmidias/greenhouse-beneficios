@@ -52,7 +52,7 @@ export default function RegisterPage() {
         <div className="mb-8">
           <a href="/login" className="text-[10px] text-zinc-500 hover:text-white font-bold uppercase tracking-widest transition-colors inline-flex items-center gap-1 mb-6">&larr; Voltar ao Login</a>
           <h1 className="text-2xl font-bold text-white tracking-tight">Solicitar Acesso</h1>
-          <p className="text-sm text-zinc-500 font-medium mt-2 leading-relaxed">Preencha seus dados corporativos. Sua conta será analisada pela equipe de Administração N8N antes da liberação.</p>
+          <p className="text-sm text-zinc-500 font-medium mt-2 leading-relaxed">Preencha seus dados. Sua conta será analisada pela Administração antes da liberação.</p>
         </div>
 
         {feedback && (
@@ -76,7 +76,7 @@ export default function RegisterPage() {
             </div>
             
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">E-mail Corporativo</label>
+              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">E-mail</label>
               <input 
                 type="email" 
                 value={email}
