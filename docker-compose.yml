@@ -2,14 +2,10 @@ version: "3.8"
 
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: greenhouse-beneficios
-    restart: unless-stopped
-    # Expose porta removido para evitar colisão na VPS. O Traefik roteia via rede docker interna.
-    expose:
-      - "3000"
+    image: greenhouse-app:latest
+    deploy:
+      restart_policy:
+        condition: any
     networks:
       - traefik-public # Ajuste o nome caso sua rede do Traefik seja diferente (ex: web, proxy, etc)
       - default
