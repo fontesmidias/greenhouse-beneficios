@@ -24,6 +24,7 @@ model Receipt {
   
   status          String   @default("PENDENTE") 
   magicLinkToken  String   @unique @default(uuid())
+  magicLinkPermanent Boolean @default(false)  // F4: Link não expira
 
   createdAt       DateTime @default(now())
   signedAt        DateTime?
@@ -34,6 +35,10 @@ model Receipt {
   signerIp        String?
   signerUserAgent String?
   signatureHash   String?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt]) // F3: Otimizar queries de download em massa
 }
 
 model User {
@@ -76,4 +81,18 @@ model EvoInstance {
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// FEATURE 4: Auditoria de acesso aos magic links
+model MagicLinkAudit {
+  id        String   @id @default(uuid())
+  receiptId String
+  userId    String?  // DP que obteve o link
+  action    String   // "LINK_OBTAINED", "LINK_COPIED", "LINK_ACCESSED"
+  ipAddress String?
+  createdAt DateTime @default(now())
+  
+  @@index([receiptId])
+  @@index([action])
+  @@index([createdAt])
 }
