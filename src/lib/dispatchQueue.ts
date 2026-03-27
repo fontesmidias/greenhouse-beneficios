@@ -18,16 +18,25 @@ if (!global.dispatchStatus) {
 }
 
 const spintaxVariations = [
-  "Olá *{nome}*, seu recibo de *{competencia}* já está disponível para assinatura. Acesse {link}. Equipe GreenHouse.",
-  "Oi *{nome}*! O recibo da compt. *{competencia}* foi liberado. Por favor, assine-o em {link}. Abraços, GreenHouse.",
-  "Atenção *{nome}*, o documento de *{competencia}* aguarda sua rubrica digital no portal: {link} - GreenHouse Depto Pessoal.",
-  "Saudações *{nome}*, passamos para avisar que o recibo (*{competencia}*) precisa da sua assinatura. Link direto: {link}. Obrigado!",
-  "*{nome}*, tudo bem? Seu comprovante *{competencia}* está gerado. Acesse a área restrita para assinar: {link}. GreenHouse DP.",
-  "Notificação GreenHouse: *{nome}*, solicitamos a assinatura eletrônica do mês *{competencia}*. É rápido: {link}.",
-  "Olá! O departamento pessoal disponibilizou o novo recibo *{competencia}* para *{nome}*. Confirme assinando aqui: {link}.",
-  "Bom dia/tarde *{nome}*. O seu holerite/recibo de *{competencia}* já foi subido ao cofre. Avalize o termo acessando {link}.",
-  "Aviso: *{nome}*, não esqueça de conferir e assinar os benefícios referentes a *{competencia}* no endereço seguro: {link}.",
-  "GreenHouse Informa: *{nome}*, o processo *{competencia}* já se encontra apto para via digital. Assine em {link}."
+  "Olá *{nome}*,\n\nSeu *Recibo de Benefícios* de *{competencia}* já está disponível para assinatura.\n\nSolicitamos que assine ainda hoje em: {link}\n\nEquipe GreenHouse Benefícios",
+  
+  "Oi *{nome}*,\n\nO *Recibo de Benefícios* referente a *{competencia}* foi liberado.\n\nRequeremos assinatura hoje mesmo: {link}\n\nAbraços,\nGreenHouse",
+  
+  "Atenção *{nome}*,\n\nSeu *Recibo de Benefícios* de *{competencia}* aguarda sua rubrica digital no portal.\n\nÉ necessário assinar hoje: {link}\n\nGreenHouse Depto Pessoal",
+  
+  "Saudações *{nome}*,\n\nO *Recibo de Benefícios* (*{competencia}*) precisa da sua assinatura digital com urgência.\n\nLink direto: {link}\n\nObrigado!\nGreenHouse Benefícios",
+  
+  "*{nome}*,\n\nSeu *Recibo de Benefícios* de *{competencia}* está gerado e aguarda assinatura.\n\nSolicitamos que regularize ainda hoje acessando:\n{link}\n\nGreenHouse DP",
+  
+  "Notificação GreenHouse\n\n*{nome}*, solicitamos a assinatura eletrônica do seu *Recibo de Benefícios* de *{competencia}* impreterivelmente hoje.\n\nAcesse: {link}",
+  
+  "Olá *{nome}*,\n\nO departamento pessoal disponibilizou seu *Recibo de Benefícios* de *{competencia}*.\n\nConfirme assinando ainda hoje aqui:\n{link}\n\nGreenHouse",
+  
+  "Bom dia/tarde *{nome}*,\n\nSeu *Recibo de Benefícios* de *{competencia}* já foi processado e requer assinatura hoje.\n\nAvalize o termo acessando:\n{link}\n\nGreenHouse Benefícios",
+  
+  "Aviso: *{nome}*,\n\nNão esqueça de conferir e assinar seu *Recibo de Benefícios* de *{competencia}* ainda hoje no portal seguro:\n\n{link}\n\nGreenHouse",
+  
+  "GreenHouse Informa\n\n*{nome}*, seu *Recibo de Benefícios* de *{competencia}* está apto para assinatura digital. Assine impreterivelmente hoje:\n\n{link}"
 ];
 
 function getRandomDelay(minSec: number, maxSec: number) {
