@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     
-    // Parse as JSON with headers
-    const data = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+    // Parse as JSON with headers, forcing RAW parsing to false to respect Excel's visual dates (e.g. 01/01/2026 instead of 46023)
+    const data = xlsx.utils.sheet_to_json(sheet, { defval: "", raw: false, dateNF: 'dd/mm/yyyy' });
     
     if (data.length === 0) {
       return NextResponse.json({ error: 'A planilha está vazia.' }, { status: 400 });

@@ -48,10 +48,22 @@ export async function POST(req: NextRequest) {
       db.addReceipt(receipt);
 
       const formatMoney = (val: any) => {
-        if (typeof val === 'number') {
-          return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (val === undefined || val === null || String(val).trim() === '') return 'R$ 0,00';
+        
+        let numValue = val;
+        if (typeof val === 'string') {
+          if (val.toUpperCase().includes('R$')) return val; // Already formatted
+          
+          // Assume text number (e.g., '48.3' or '48,3'). To parse as float safely:
+          // Keep digits, minus, and one trailing separator
+          let sanitized = val.replace(/[^0-9,-.]/g, ''); 
+          if (sanitized.includes(',')) sanitized = sanitized.replace(/\./g, '').replace(',', '.');
+          
+          numValue = parseFloat(sanitized);
+          if (isNaN(numValue)) return val;
         }
-        return val ? String(val) : 'R$ 0,00';
+
+        return Number(numValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       };
 
       const pdfData = {
