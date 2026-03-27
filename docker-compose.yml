@@ -1,17 +1,18 @@
 version: "3.7"
 
 services:
+  # 1. Aplicação Principal GreenHouse
   web:
     image: ghcr.io/fontesmidias/greenhouse-beneficios:latest
     networks:
       - unibotnet
     volumes:
-      - greenhouse_data:/app/data
       - greenhouse_uploads:/app/uploads
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BASE_URL=https://${DOMAIN}
-      - DATABASE_URL=file:../data/dev.db
+      # Conexão interna apontando para o serviço de banco 'db'
+      - DATABASE_URL=postgresql://greenhouseAdmin:MudarSenhaSegura123@db:5432/greenhouse_db?schema=public
       - NEXTAUTH_SECRET=sua_senha_segura_aqui_123
       - NEXTAUTH_URL=https://${DOMAIN}
       - SMTP_HOST=${SMTP_HOST}
@@ -36,11 +37,45 @@ services:
         - "traefik.http.routers.greenhouse-beneficios.tls.certresolver=letsencryptresolver"
         - "traefik.http.routers.greenhouse-beneficios.service=greenhouse-beneficios"
         - "traefik.http.services.greenhouse-beneficios.loadbalancer.server.port=3000"
+    depends_on:
+      - db
+
+  # 2. Banco de Dados PostgreSQL Específico do GreenHouse
+  db:
+    image: postgres:15-alpine
+    networks:
+      - unibotnet
+    environment:
+      - POSTGRES_USER=greenhouseAdmin
+      - POSTGRES_PASSWORD=MudarSenhaSegura123
+      - POSTGRES_DB=greenhouse_db
+    volumes:
+      - greenhouse_pg_data:/var/lib/postgresql/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  # 3. Portainer Exclusivo desta Aplicação (Porta 9005 e 9445)
+  portainer-greenhouse:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    networks:
+      - unibotnet
+    ports:
+      # Expondo na porta 9005 (HTTP) e 9445 (HTTPS) para não conflitar com o seu Portainer principal (9000/9443)
+      - "9005:9000"
+      - "9445:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_greenhouse_data:/data
+    deploy:
+      restart_policy:
+        condition: any
 
 volumes:
-  greenhouse_data:
+  greenhouse_pg_data:
   greenhouse_uploads:
-
+  portainer_greenhouse_data:
 
 networks:
   unibotnet:
