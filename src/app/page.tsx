@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { BulkReceiptSelector } from '../components/BulkReceiptSelector';
+import { LinkModal } from '../components/LinkModal';
 export default function Home() {
   const { data: session } = useSession();
   const [uploading, setUploading] = useState(false);
@@ -44,6 +46,10 @@ export default function Home() {
   // Selection state for Row Checkboxes
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
 
+  // Bulk actions state
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [bulkLinks, setBulkLinks] = useState<any[]>([]);
+
   const fetchLots = async () => {
     try {
       const res = await fetch('/api/receipts');
@@ -76,6 +82,76 @@ export default function Home() {
       fetchLots();
       setSelectedReceipts(prev => prev.filter(x => x !== id));
     } catch(e) {}
+  };
+
+  // Selection handlers
+  const toggleSelectAll = (ids: string[]) => {
+    const allSelected = ids.every(id => selectedReceipts.includes(id));
+    if (allSelected) {
+      setSelectedReceipts(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setSelectedReceipts(prev => [...new Set([...prev, ...ids])]);
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedReceipts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  // Bulk actions handlers
+  const handleBulkDownload = async () => {
+    if (selectedReceipts.length === 0) {
+      setFeedback({ type: 'warning', text: 'Selecione pelo menos um recibo para download.' });
+      return;
+    }
+    try {
+      const res = await fetch('/api/download/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptIds: selectedReceipts })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        setFeedback({ type: 'error', text: error.error || 'Erro no download em massa.' });
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'recibos-bulk.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      setFeedback({ type: 'success', text: 'Download em massa concluído!' });
+    } catch (e) {
+      setFeedback({ type: 'error', text: 'Erro ao baixar ZIP.' });
+    }
+  };
+
+  const handleGetBulkLinks = async () => {
+    if (selectedReceipts.length === 0) {
+      setFeedback({ type: 'warning', text: 'Selecione pelo menos um recibo para obter links.' });
+      return;
+    }
+    try {
+      const res = await fetch('/api/receipts/links/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptIds: selectedReceipts })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        setFeedback({ type: 'error', text: error.error || 'Erro ao obter links.' });
+        return;
+      }
+      const data = await res.json();
+      setBulkLinks(data.links);
+      setLinkModalOpen(true);
+    } catch (e) {
+      setFeedback({ type: 'error', text: 'Erro ao obter links.' });
+    }
   };
 
   const processFile = async (file: File) => {
@@ -169,19 +245,6 @@ export default function Home() {
     } else {
       setSortKey(key);
       setSortOrder('desc');
-    }
-  };
-
-  // Checkbox Logistics
-  const toggleSelection = (id: string) => {
-    setSelectedReceipts(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-  const toggleSelectAll = (lotIds: string[]) => {
-    const allSelected = lotIds.every(id => selectedReceipts.includes(id));
-    if (allSelected) {
-      setSelectedReceipts(prev => prev.filter(id => !lotIds.includes(id)));
-    } else {
-      setSelectedReceipts(prev => Array.from(new Set([...prev, ...lotIds])));
     }
   };
 
@@ -392,6 +455,12 @@ export default function Home() {
                   <button onClick={fetchLots} className="p-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all border border-white/5" title="Recarregar">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                   </button>
+                  <button onClick={handleBulkDownload} disabled={selectedReceipts.length === 0 || dispatching} className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl transition-all border border-emerald-500/20 disabled:opacity-50" title="Download ZIP em Massa">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                  </button>
+                  <button onClick={handleGetBulkLinks} disabled={selectedReceipts.length === 0 || dispatching} className="p-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 rounded-xl transition-all border border-sky-500/20 disabled:opacity-50" title="Obter Links em Massa">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                  </button>
                 </div>
               </div>
 
@@ -525,6 +594,13 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      <LinkModal 
+        isOpen={linkModalOpen} 
+        onClose={() => setLinkModalOpen(false)} 
+        title="Links de Acesso - Recibos Selecionados"
+        links={bulkLinks} 
+      />
     </div>
   );
 }
