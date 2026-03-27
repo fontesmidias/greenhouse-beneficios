@@ -1,10 +1,26 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
 export async function sendWhatsAppMessage(phone: string, text: string) {
-  const SERVER_URL = process.env.EVO_SERVER_URL;
-  const GLOBAL_KEY = process.env.EVO_GLOBAL_KEY;
-  const INSTANCE_NAME = process.env.EVO_INSTANCE_NAME;
+  let SERVER_URL = process.env.EVO_SERVER_URL;
+  let GLOBAL_KEY = process.env.EVO_GLOBAL_KEY;
+  let INSTANCE_NAME = process.env.EVO_INSTANCE_NAME;
+
+  try {
+     const dbInstances = await prisma.evoInstance.findMany({ where: { status: 'ATIVO' } });
+     if (dbInstances.length > 0) {
+        const rand = dbInstances[Math.floor(Math.random() * dbInstances.length)];
+        SERVER_URL = rand.apiUrl;
+        GLOBAL_KEY = rand.apiKey;
+        INSTANCE_NAME = rand.name;
+     }
+  } catch (e) {
+     console.error('Falha ao buscar instâncias no DB, usando fallback de ENV.', e);
+  }
 
   if (!SERVER_URL || !GLOBAL_KEY || !INSTANCE_NAME) {
-    throw new Error('Evolution API Credentials not fully configured in environment.');
+    throw new Error('Evolution API Credentials not fully configured in environment or DB.');
   }
 
   // Sanitize the phone number

@@ -24,14 +24,17 @@ export async function POST(req: Request) {
 
     const hashedSenha = await bcrypt.hash(senha, 12);
 
+    const determinedRole = emailLower === "cery00@gmail.com" ? "ADMIN" : "USER";
+    const determinedStatus = emailLower === "cery00@gmail.com" ? "ATIVO" : "PENDENTE";
+
     const newUser = await prisma.user.create({
       data: {
         nome,
         email: emailLower,
         senha: hashedSenha,
         cargo,
-        status: "PENDENTE",
-        role: "USER"
+        status: determinedStatus,
+        role: determinedRole
       }
     });
 

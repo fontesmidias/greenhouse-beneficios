@@ -12,10 +12,35 @@ export default function Home() {
   const [lots, setLots] = useState<any[]>([]);
   const [dragging, setDragging] = useState(false);
 
-  // Sorting state for the Tracker Table
   const [sortKey, setSortKey] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
+  // Dispatch advanced settings & polling
+  const [intervalMin, setIntervalMin] = useState<number>(3);
+  const [intervalMax, setIntervalMax] = useState<number>(8);
+  const [scheduledTime, setScheduledTime] = useState<string>('');
+  const [dispatchStatus, setDispatchStatus] = useState<any>(null);
+
+  useEffect(() => {
+    let polling: any;
+    if (dispatching) {
+       polling = setInterval(async () => {
+         try {
+           const res = await fetch('/api/dispatch/status');
+           const data = await res.json();
+           setDispatchStatus(data);
+           if (!data?.active && data?.total > 0 && dispatching) {
+             setDispatching(false);
+             fetchLots(); 
+             setFeedback({ type: 'success', text: `✨ Operação concluída. ${data.sent} envios confirmados.` });
+           }
+         } catch(e) {}
+       }, 2000);
+    }
+    return () => clearInterval(polling);
+  }, [dispatching]);
+
   // Selection state for Row Checkboxes
   const [selectedReceipts, setSelectedReceipts] = useState<string[]>([]);
 
@@ -124,8 +149,13 @@ export default function Home() {
     }
   };
 
-  const sortReceipts = (receipts: any[]) => {
-    return [...receipts].sort((a, b) => {
+  const filterAndSortReceipts = (receipts: any[]) => {
+    let filtered = receipts;
+    if (searchQuery.trim().length > 0) {
+       const q = searchQuery.toLowerCase();
+       filtered = receipts.filter(r => (r.nome?.toLowerCase().includes(q) || r.cpf?.includes(q)));
+    }
+    return [...filtered].sort((a, b) => {
       let valA = a[sortKey] || '';
       let valB = b[sortKey] || '';
       if (sortOrder === 'asc') return valA > valB ? 1 : -1;
@@ -160,29 +190,26 @@ export default function Home() {
     if (ids.length === 0) { alert('Selecione pelo menos 1 recibo marcando a caixa.'); return; }
     
     setDispatching(true);
-    setFeedback({ type: 'warning', text: `Disparando via ${channels.join('/')} para ${ids.length} contatos...` });
+    setFeedback({ type: 'warning', text: `Iniciando job de disparo via ${channels.join('/')} para ${ids.length} destinos...` });
     
     try {
       const res = await fetch('/api/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiptIds: ids, channels })
+        body: JSON.stringify({ receiptIds: ids, channels, intervalMin, intervalMax, scheduledTime })
       });
       const data = await res.json();
       
-      if (!res.ok) throw new Error(data.error || 'Erro Crítico no Gateway de Mensageria');
-      if (data.failures && data.failures.length > 0) {
-        setFeedback({ type: 'warning', text: `Disparo concluído: Sucesso: ${data.count}. Falhas: ${data.failures.length} (Contato Vazio ou Erro)` });
-      } else {
-        setFeedback({ type: 'success', text: `🚀 Disparo Total Concluído! ${data.count} notificações enviadas com sucesso.` });
+      if (!res.ok) {
+        setDispatching(false);
+        throw new Error(data.error || 'Erro Crítico no Gateway de Mensageria');
       }
-      setSelectedReceipts([]); // Clear selection after successful dispatch
-      fetchLots(); // Refresh to see statuses
+      
+      setSelectedReceipts([]); 
     } catch (e: any) {
       setFeedback({ type: 'error', text: e.message });
-    } finally {
       setDispatching(false);
-    }
+    } 
   };
 
   return (
@@ -308,12 +335,55 @@ export default function Home() {
           {/* RIGHTSIDE: DATAGRID */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             <div className="bg-[#111113]/60 backdrop-blur-xl p-8 rounded-[2rem] ring-1 ring-white/5 shadow-2xl h-full flex flex-col relative overflow-hidden">
-              <div className="flex justify-between items-end mb-8 relative z-10">
-                <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Monitor de Operações</h2>
-                  <p className="text-zinc-500 text-xs font-medium mt-1">Acervo de Documentos e Envio via Mensageria (Evo / SMTP).</p>
+              <div className="flex flex-col mb-8 relative z-10 gap-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold text-white tracking-tight">Motor de Roteamento Pessoal</h2>
+                    <p className="text-zinc-500 text-xs font-medium mt-1">Configure regras de intervalo randômico para contornar restrições de SPAM do WhatsApp.</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0A0A0B] p-4 rounded-2xl ring-1 ring-white/5 border border-white/5">
+                   <div>
+                     <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1.5">Intervalo Min. (Segs)</label>
+                     <input type="number" min={1} value={intervalMin} onChange={e => setIntervalMin(Number(e.target.value))} className="w-full bg-[#111113] border border-white/5 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
+                   </div>
+                   <div>
+                     <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1.5">Intervalo Max. (Segs)</label>
+                     <input type="number" min={2} value={intervalMax} onChange={e => setIntervalMax(Number(e.target.value))} className="w-full bg-[#111113] border border-white/5 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
+                   </div>
+                   <div>
+                     <label className="block text-[9px] font-bold text-emerald-500/70 uppercase mb-1.5">Agendar Disparo Lote (Opcional)</label>
+                     <input type="datetime-local" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} className="w-full bg-[#111113] border border-emerald-500/20 rounded-lg px-3 py-2 text-emerald-400 text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
+                   </div>
+                </div>
+
+                {dispatching && dispatchStatus?.active && (
+                   <div className="w-full bg-[#0A0A0B] p-5 rounded-2xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] relative overflow-hidden">
+                     <div className="absolute top-0 right-0 bottom-0 w-1/3 bg-gradient-to-l from-emerald-500/10 to-transparent"></div>
+                     <div className="flex justify-between text-xs font-bold text-zinc-300 mb-2">
+                       <span className="text-emerald-400">DISPARANDO LOTE... ({dispatchStatus.sent}/{dispatchStatus.total})</span>
+                       <span>Aprox. ~{dispatchStatus.etaSeconds}s restantes</span>
+                     </div>
+                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                       <div className="h-full bg-emerald-500 transition-all duration-700 ease-out" style={{width: `${(dispatchStatus.sent / dispatchStatus.total) * 100}%`}}></div>
+                     </div>
+                   </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-end mb-6 relative z-10">
+                <div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">Acervo de Lotes</h2>
+                </div>
+                <div className="flex gap-4 items-center">
+                  <input 
+                     type="text" 
+                     placeholder="Buscar por nome ou CPF..." 
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                     className="bg-[#0A0A0B] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all w-64"
+                  />
                   <button onClick={fetchLots} className="p-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all border border-white/5" title="Recarregar">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                   </button>
@@ -391,7 +461,7 @@ export default function Home() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                              {sortReceipts(lot.receipts).map((rec: any, rIdx: number) => (
+                              {filterAndSortReceipts(lot.receipts).map((rec: any, rIdx: number) => (
                                 <tr key={rIdx} className="hover:bg-white/[0.04] transition-colors group/row">
                                   <td className="px-4 py-3">
                                     <input 

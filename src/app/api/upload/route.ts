@@ -25,10 +25,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A planilha está vazia.' }, { status: 400 });
     }
 
-    // Basic validation check
-    const firstRow = data[0] as any;
-    if (!firstRow.hasOwnProperty('NOME') || !firstRow.hasOwnProperty('CPF')) {
-      return NextResponse.json({ error: 'Planilha inválida. O cabeçalho deve conter NOME e CPF. Baixe o modelo padrão.' }, { status: 400 });
+    // Detailed validation check per row to give precise UI feedback
+    for (let i = 0; i < data.length; i++) {
+       const row = data[i] as any;
+       const rowNumber = i + 2; // +1 for 0-index, +1 for header
+
+       if (!row['NOME'] || String(row['NOME']).trim() === '') {
+          return NextResponse.json({ error: `🚨 ERRO NA PLANILHA (Linha ${rowNumber}): A coluna "NOME" está vazia ou ausente.` }, { status: 400 });
+       }
+       if (!row['CPF'] || String(row['CPF']).trim() === '') {
+          return NextResponse.json({ error: `🚨 ERRO NA PLANILHA (Linha ${rowNumber}): A coluna "CPF" está inválida para o Colaborador ${row['NOME']}.` }, { status: 400 });
+       }
     }
 
     logger.info(`Planilha lida validada com sucesso. Colaboradores: ${data.length}`, { file: file.name });
