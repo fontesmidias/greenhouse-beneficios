@@ -114,6 +114,29 @@ export async function POST(req: Request) {
       }
     }
 
+    // Always send the WhatsApp message with the verified PDF if phone exists!
+    if (rx.telefone) {
+       try {
+         // Evolution API requires base64 string or data uri
+         const pdfBase64 = Buffer.from(signedPdfBytes).toString('base64');
+         const dataUri = `data:application/pdf;base64,${pdfBase64}`;
+         const { sendWhatsAppMedia } = require('../../../lib/whatsapp');
+         
+         const numberStr = String(rx.telefone).replace(/\D/g, '');
+         if (numberStr.length >= 10) {
+            await sendWhatsAppMedia(
+              numberStr,
+              dataUri,
+              `Recibo_Assinado_${rx.competencia.replace('/', '-')}.pdf`,
+              `Olá ${rx.nome}, sua assinatura foi registrada com sucesso! Segue em anexo a sua cópia oficial validada.`
+            );
+            logger.info(`WhatsApp de recibo assinado enviado para ${numberStr}`);
+         }
+       } catch (e) {
+         logger.error(`Falha ao disparar media via WhatsApp para ${rx.telefone}`, { erro: String(e) });
+       }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('Sign API Error:', err);

@@ -151,8 +151,14 @@ function SignPortalContent() {
              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
            </div>
            <h2 className="text-2xl font-bold tracking-tight text-emerald-400 mb-2">Assinatura Concluída</h2>
-           <p className="text-zinc-400 text-sm leading-relaxed mb-6">Seu recibo foi criptografado com sucesso. A empresa foi notificada e uma cópia segura foi disparada para os seus contatos registrados.</p>
-           <button onClick={() => window.close()} className="px-6 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors ring-1 ring-white/10">Fechar Janela</button>
+           <p className="text-zinc-400 text-sm leading-relaxed mb-6">Seu recibo foi deferido com sucesso e assinado criptograficamente. A empresa foi notificada e uma cópia segura foi disparada para o seu WhatsApp e/ou E-mail (caso cadastrados).</p>
+           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+             <a href={`/api/pdf?token=${token}`} download="Recibo_Assinado_Autenticado.pdf" className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-sm font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] w-full sm:w-auto flex justify-center items-center gap-2">
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+               Baixar Documento PDF
+             </a>
+             <button onClick={() => window.close()} className="px-6 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors ring-1 ring-white/10 w-full sm:w-auto">Sessão Concluída</button>
+           </div>
         </div>
       </div>
     );
