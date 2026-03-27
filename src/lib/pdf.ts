@@ -148,8 +148,26 @@ export async function generateReceiptPDF(data: any): Promise<Uint8Array> {
     cursorY -= 16;
   }
 
-  if (data.obs && data.obs.trim() !== '' && data.obs !== 'Sem observações') {
-    drawText(`Observação: ${data.obs}`, helvetica, 8, margin);
+  if (data.obs && data.obs.trim() !== '' && data.obs.trim().toLowerCase() !== 'sem observações' && data.obs.trim().toLowerCase() !== 'sem observacoes') {
+    const obsText = `Observação: ${data.obs}`;
+    const obsWords = obsText.split(' ');
+    let obsLine = '';
+    
+    for (const word of obsWords) {
+      const testLine = obsLine === '' ? word : `${obsLine} ${word}`;
+      const testWidth = helvetica.widthOfTextAtSize(testLine, 8);
+      if (testWidth > maxW) {
+        page.drawText(obsLine, { x: margin, y: cursorY, size: 8, font: helvetica, color: rgb(0, 0, 0) });
+        cursorY -= 10;
+        obsLine = word;
+      } else {
+        obsLine = testLine;
+      }
+    }
+    if (obsLine !== '') {
+      page.drawText(obsLine, { x: margin, y: cursorY, size: 8, font: helvetica, color: rgb(0, 0, 0) });
+      cursorY -= 12;
+    }
   }
 
   // --- FIXED BOTTOM BLOCK ---
