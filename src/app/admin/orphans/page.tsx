@@ -41,6 +41,12 @@ export default function AdminOrphansPage() {
   const [identifying, setIdentifying] = useState(false);
   const [identified, setIdentified] = useState(false);
 
+  // Paginacao server-side (50 por pagina, evita timeout)
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
+
   // Send-email modal
   const [emailModalFor, setEmailModalFor] = useState<Orphan | null>(null);
   const [emailTo, setEmailTo] = useState("");
@@ -53,59 +59,99 @@ export default function AdminOrphansPage() {
     setTimeout(() => setToast(null), 5000);
   };
 
+  const fetchPage = async (offset: number, parse: boolean): Promise<{ orphans: Orphan[]; total: number; hasMore: boolean } | null> => {
+    const url = `/api/admin/orphans?offset=${offset}&limit=${PAGE_SIZE}&parse=${parse}&status=${filter}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || `HTTP ${res.status}`);
+    }
+    return {
+      orphans: Array.isArray(json.orphans) ? json.orphans : [],
+      total: typeof json.total === "number" ? json.total : 0,
+      hasMore: !!json.hasMore,
+    };
+  };
+
   const loadOrphans = async () => {
     setLoading(true);
     setIdentified(false);
+    setOrphans([]);
     try {
-      const res = await fetch("/api/admin/orphans");
-      const json = await res.json();
-      if (res.ok) {
-        setOrphans(Array.isArray(json.orphans) ? json.orphans : []);
-        if (Array.isArray(json.orphans) && json.orphans.length === 0) {
-          showToast({ type: "info", text: "Backend respondeu vazio. Confira o Debug se isso parecer errado." });
-        }
-      } else {
-        showToast({ type: "error", text: json.error || `Falha HTTP ${res.status}.` });
+      const r = await fetchPage(0, false);
+      if (!r) return;
+      setOrphans(r.orphans);
+      setTotal(r.total);
+      setHasMore(r.hasMore);
+      if (r.total === 0) {
+        showToast({ type: "info", text: "Nenhum arquivo órfão. Se você esperava arquivos aqui, abra Debug pra investigar." });
       }
     } catch (e: any) {
-      showToast({ type: "error", text: `Servidor indisponível: ${e?.message || e}` });
+      showToast({ type: "error", text: `Falha ao carregar: ${e?.message || e}` });
     }
     setLoading(false);
   };
 
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await fetchPage(orphans.length, identified);
+      if (!r) return;
+      setOrphans((prev) => [...prev, ...r.orphans]);
+      setTotal(r.total);
+      setHasMore(r.hasMore);
+    } catch (e: any) {
+      showToast({ type: "error", text: `Falha ao carregar mais: ${e?.message || e}` });
+    }
+    setLoadingMore(false);
+  };
+
+  /**
+   * Identifica todos os arquivos em chunks de 50 (página por página).
+   * Cada chunk tem ~10s de parse, NUNCA estoura timeout do proxy.
+   * Atualiza a tabela conforme cada chunk chega — feedback progressivo.
+   */
   const identifyAll = async () => {
-    if (orphans.length === 0) return;
+    if (total === 0) return;
     setIdentifying(true);
     try {
-      // Pode demorar minutos com 300+ PDFs. Usuario foi avisado.
-      const res = await fetch("/api/admin/orphans?parse=true");
-      const json = await res.json();
-      if (res.ok) {
-        setOrphans(Array.isArray(json.orphans) ? json.orphans : []);
-        setIdentified(true);
-        showToast({ type: "success", text: "Arquivos identificados com sucesso." });
-      } else {
-        showToast({ type: "error", text: json.error || "Falha ao identificar arquivos." });
+      const updated: Orphan[] = [];
+      let offset = 0;
+      let continueLoop = true;
+      while (continueLoop) {
+        const r = await fetchPage(offset, true);
+        if (!r) break;
+        updated.push(...r.orphans);
+        // Atualiza tabela em tempo real
+        setOrphans([...updated]);
+        setTotal(r.total);
+        setHasMore(r.hasMore);
+        offset += PAGE_SIZE;
+        continueLoop = r.hasMore;
       }
+      setIdentified(true);
+      showToast({ type: "success", text: `Identificação concluída: ${updated.length} arquivos.` });
     } catch (e: any) {
-      showToast({ type: "error", text: `Falha ao identificar: ${e?.message || e}. Pode ter dado timeout — tente baixar o ZIP, que tem o parse com cache.` });
+      showToast({ type: "error", text: `Identificação interrompida: ${e?.message || e}. Os já carregados permanecem na tabela.` });
     }
     setIdentifying(false);
   };
 
   useEffect(() => {
     if (status === "authenticated") loadOrphans();
-  }, [status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, filter]);
 
-  const filtered = useMemo(() => {
-    if (filter === "ALL") return orphans;
-    return orphans.filter((o) => o.status === filter);
-  }, [orphans, filter]);
+  // Filtro agora é server-side (faz parte da query), entao filtered = orphans
+  const filtered = orphans;
 
+  // Contadores rápidos nos cards: usam o que está carregado em memória.
+  // O total real (do servidor) está na variável `total`.
   const counts = useMemo(() => {
     const assinados = orphans.filter((o) => o.status === "ASSINADO").length;
     const sem = orphans.filter((o) => o.status === "SEM_ASSINATURA").length;
-    return { total: orphans.length, assinados, sem };
+    return { assinados, sem };
   }, [orphans]);
 
   if (status === "loading" || loading) {
@@ -219,15 +265,16 @@ export default function AdminOrphansPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-[#111113]/80 border border-white/5 rounded-2xl p-5">
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Total no volume</div>
-            <div className="text-3xl font-bold text-white">{counts.total}</div>
+            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Total no volume {filter !== "ALL" && `(filtro: ${filter})`}</div>
+            <div className="text-3xl font-bold text-white">{total}</div>
+            <div className="text-[10px] text-zinc-600 mt-1">{orphans.length} carregados na tela</div>
           </div>
           <div className="bg-[#111113]/80 border border-emerald-500/20 rounded-2xl p-5">
-            <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-2">Assinados</div>
+            <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-2">Assinados (carregados)</div>
             <div className="text-3xl font-bold text-emerald-400">{counts.assinados}</div>
           </div>
           <div className="bg-[#111113]/80 border border-amber-500/20 rounded-2xl p-5">
-            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Sem Assinatura</div>
+            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Sem Assinatura (carregados)</div>
             <div className="text-3xl font-bold text-amber-400">{counts.sem}</div>
           </div>
         </div>
@@ -249,11 +296,11 @@ export default function AdminOrphansPage() {
             <div className="flex gap-3 flex-wrap">
               <button
                 onClick={identifyAll}
-                disabled={identifying || orphans.length === 0 || identified}
+                disabled={identifying || total === 0 || identified}
                 className="bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-400 font-bold py-2.5 px-5 rounded-xl ring-1 ring-blue-500/30 transition-all text-xs uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
-                title={identified ? "Já identificados nesta sessão" : "Lê cada PDF para extrair nome, CPF e competência. Pode demorar com muitos arquivos."}
+                title={identified ? "Já identificados nesta sessão" : "Lê cada PDF em chunks de 50 para extrair nome, CPF e competência. Atualiza a tela conforme processa."}
               >
-                {identifying ? "Identificando..." : identified ? "✓ Identificados" : `🔍 Identificar arquivos (${orphans.length})`}
+                {identifying ? `Identificando... (${orphans.length}/${total})` : identified ? "✓ Identificados" : `🔍 Identificar arquivos (${total})`}
               </button>
               <button
                 onClick={downloadAllZip}
@@ -334,6 +381,22 @@ export default function AdminOrphansPage() {
                   ))}
                 </tbody>
               </table>
+
+              {hasMore && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore || identifying}
+                    className="bg-white/5 hover:bg-white/10 text-zinc-300 font-bold py-2.5 px-6 rounded-xl ring-1 ring-white/10 transition-all text-xs uppercase tracking-wide disabled:opacity-40"
+                  >
+                    {loadingMore ? "Carregando..." : `Carregar mais (faltam ${total - orphans.length})`}
+                  </button>
+                </div>
+              )}
+
+              {!hasMore && orphans.length > PAGE_SIZE && (
+                <div className="text-center text-[10px] text-zinc-600 mt-4 italic">Todos os {total} arquivos carregados.</div>
+              )}
             </div>
           )}
         </div>
