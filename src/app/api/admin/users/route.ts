@@ -1,19 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmailMessage } from "@/lib/email";
+import { requireAdmin } from "@/lib/authz";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || role !== "ADMIN") {
-    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-  }
-  return null;
-}
 
 function buildWelcomeEmailHtml(nome: string, resetLink: string) {
   return `

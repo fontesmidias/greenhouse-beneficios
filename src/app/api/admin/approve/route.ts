@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmailMessage } from "@/lib/email";
 
@@ -6,6 +8,20 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+
+    // Esse endpoint é acessado via link no e-mail enviado ao admin.
+    // Exige sessão NextAuth com role=ADMIN. Se não logado, redireciona pro /login
+    // preservando a URL de retorno.
+    const session = await getServerSession(authOptions);
+    const role = (session?.user as any)?.role;
+    if (!session) {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+      const callbackUrl = encodeURIComponent(`/api/admin/approve?id=${id || ''}`);
+      return NextResponse.redirect(`${baseUrl}/login?callbackUrl=${callbackUrl}`);
+    }
+    if (role !== "ADMIN") {
+      return new NextResponse("Acesso negado. Apenas administradores podem aprovar usuários.", { status: 403 });
+    }
 
     if (!id) {
       return new NextResponse("ID Inválido.", { status: 400 });

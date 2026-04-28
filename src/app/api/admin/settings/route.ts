@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { requireAdmin } from '@/lib/authz';
 
 const prisma = new PrismaClient();
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const smtps = await prisma.smtpConfig.findMany();
     const evos = await prisma.evoInstance.findMany();
@@ -14,6 +18,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const { action, type, data } = await req.json();
 
@@ -32,7 +39,7 @@ export async function POST(req: NextRequest) {
          await prisma.evoInstance.update({ where: { id: data.id }, data: { status: data.status } });
        }
     }
-    
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: 'Falha ao executar ação', msg: error.message }, { status: 500 });
