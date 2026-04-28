@@ -37,6 +37,11 @@ export default function AdminOrphansPage() {
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
 
+  // Inspect modal (mostra texto bruto extraído de UM PDF)
+  const [inspectOpen, setInspectOpen] = useState(false);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [inspectData, setInspectData] = useState<any>(null);
+
   // Identificacao via parse (lazy, sob demanda — parse pesado, default off)
   const [identifying, setIdentifying] = useState(false);
   const [identified, setIdentified] = useState(false);
@@ -184,6 +189,32 @@ export default function AdminOrphansPage() {
     window.location.href = `/api/admin/orphans/download-all?status=${filter}${parseQs}`;
   };
 
+  const inspectFile = async (filename: string) => {
+    setInspectOpen(true);
+    setInspectLoading(true);
+    setInspectData(null);
+    try {
+      const res = await fetch(`/api/admin/orphans/inspect?file=${encodeURIComponent(filename)}`);
+      const json = await res.json();
+      setInspectData(json);
+    } catch (e: any) {
+      setInspectData({ error: e?.message || "Falha ao inspecionar" });
+    }
+    setInspectLoading(false);
+  };
+
+  const clearParseCacheAndReload = async () => {
+    if (!confirm("Limpar cache de parse e recarregar? Próxima identificação vai reprocessar tudo.")) return;
+    try {
+      await fetch("/api/admin/orphans/clear-cache", { method: "POST" });
+      showToast({ type: "info", text: "Cache limpo. Clique em 'Identificar arquivos' novamente." });
+      setIdentified(false);
+      loadOrphans();
+    } catch (e: any) {
+      showToast({ type: "error", text: `Falha ao limpar cache: ${e?.message || e}` });
+    }
+  };
+
   const openDebug = async () => {
     setDebugOpen(true);
     setDebugLoading(true);
@@ -257,6 +288,7 @@ export default function AdminOrphansPage() {
           </div>
           <div className="flex gap-3 flex-wrap">
             <button onClick={openDebug} className="bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-amber-500/30 uppercase tracking-widest text-amber-400" title="Inspecionar estado do servidor (paths, contagens)">🔧 Debug</button>
+            <button onClick={clearParseCacheAndReload} className="bg-rose-500/10 hover:bg-rose-500/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-rose-500/30 uppercase tracking-widest text-rose-400" title="Limpa cache de parse para forçar reidentificação com regex novo">♻ Limpar cache</button>
             <a href="/admin/users" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Gerenciar Usuários</a>
             <a href="/admin/settings" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Engrenagens</a>
             <a href="/" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Painel Operacional</a>
@@ -370,6 +402,13 @@ export default function AdminOrphansPage() {
                             Enviar por e-mail
                           </button>
                           <button
+                            onClick={() => inspectFile(o.filename)}
+                            className="bg-amber-500/10 hover:bg-amber-500 hover:text-[#070708] text-amber-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ring-1 ring-amber-500/30 transition-all"
+                            title="Ver texto bruto extraído deste PDF (calibrar regex)"
+                          >
+                            🔬
+                          </button>
+                          <button
                             onClick={() => deleteOrphan(o.filename)}
                             className="bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ring-1 ring-rose-500/30 transition-all"
                           >
@@ -424,6 +463,50 @@ export default function AdminOrphansPage() {
             ) : (
               <pre className="bg-[#0A0A0B] border border-white/5 rounded-xl p-4 text-[11px] font-mono text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(debugData, null, 2)}</pre>
             )}
+          </div>
+        </div>
+      )}
+
+      {inspectOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setInspectOpen(false)}>
+          <div className="bg-[#111113] border border-white/10 rounded-[2rem] p-8 max-w-3xl w-full max-h-[85vh] overflow-auto shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50"></div>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-amber-400 mb-1">🔬 Inspeção de PDF</h2>
+                <p className="text-xs text-zinc-500">Texto bruto extraído pelo pdf-parse + resultado das regex de extração. Útil pra calibrar quando o nome não bate.</p>
+              </div>
+              <button onClick={() => setInspectOpen(false)} className="text-zinc-500 hover:text-white text-2xl leading-none">×</button>
+            </div>
+            {inspectLoading ? (
+              <div className="text-zinc-400 animate-pulse py-8 text-center">Inspecionando...</div>
+            ) : inspectData ? (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Arquivo</div>
+                  <div className="text-xs font-mono text-zinc-300 break-all">{inspectData.file}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Resultado do parse (extractFields)</div>
+                  <pre className="bg-[#0A0A0B] border border-emerald-500/20 rounded-xl p-3 text-[11px] font-mono text-emerald-200 overflow-x-auto">{JSON.stringify(inspectData.parsed, null, 2)}</pre>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                    Texto bruto ({inspectData.rawTextLength} chars, mostrando primeiros 5000)
+                  </div>
+                  <pre className="bg-[#0A0A0B] border border-white/5 rounded-xl p-3 text-[11px] font-mono text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all max-h-96 overflow-y-auto">{inspectData.rawText}</pre>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Primeiras 30 linhas</div>
+                  <pre className="bg-[#0A0A0B] border border-white/5 rounded-xl p-3 text-[11px] font-mono text-zinc-400 overflow-x-auto">{inspectData.rawTextSample?.join("\n")}</pre>
+                </div>
+                {inspectData.parseError && (
+                  <div className="bg-rose-500/10 ring-1 ring-rose-500/30 text-rose-300 p-3 rounded-xl text-xs">
+                    Erro durante extração de texto: {inspectData.parseError}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       )}
