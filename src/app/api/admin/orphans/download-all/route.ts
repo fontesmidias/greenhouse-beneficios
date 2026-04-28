@@ -23,8 +23,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Nenhum arquivo órfão para o filtro selecionado." }, { status: 404 });
     }
 
-    // Parse metadata (cache hit é instantâneo após primeira listagem)
-    const parsedMap = await parseMany(orphans, UPLOADS_DIR, 5);
+    // Parse só se solicitado (cache hit é instantâneo após primeira identificação;
+    // sem cache, parsear 300+ PDFs estoura timeout do proxy reverso).
+    const shouldParse = searchParams.get("parse") === "true";
+    const parsedMap = shouldParse
+      ? await parseMany(orphans, UPLOADS_DIR, 5)
+      : new Map<string, undefined>();
 
     const zip = new JSZip();
     for (const o of orphans) {
@@ -32,8 +36,8 @@ export async function GET(req: Request) {
       const fullPath = path.join(UPLOADS_DIR, o.filename);
       try {
         const data = fs.readFileSync(fullPath);
-        const parsed = parsedMap.get(o.filename) || undefined;
-        const friendlyName = buildDownloadFilename(o.filename, o.status, parsed || undefined);
+        const parsed = (parsedMap.get(o.filename) as any) || undefined;
+        const friendlyName = buildDownloadFilename(o.filename, o.status, parsed);
         zip.file(`${folder}/${friendlyName}`, data);
       } catch (e) {
         console.warn("[admin/orphans/download-all] arquivo sumiu durante zip", o.filename);

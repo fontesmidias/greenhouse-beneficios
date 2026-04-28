@@ -37,6 +37,10 @@ export default function AdminOrphansPage() {
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
 
+  // Identificacao via parse (lazy, sob demanda — parse pesado, default off)
+  const [identifying, setIdentifying] = useState(false);
+  const [identified, setIdentified] = useState(false);
+
   // Send-email modal
   const [emailModalFor, setEmailModalFor] = useState<Orphan | null>(null);
   const [emailTo, setEmailTo] = useState("");
@@ -51,15 +55,42 @@ export default function AdminOrphansPage() {
 
   const loadOrphans = async () => {
     setLoading(true);
+    setIdentified(false);
     try {
       const res = await fetch("/api/admin/orphans");
       const json = await res.json();
-      if (res.ok) setOrphans(json.orphans || []);
-      else showToast({ type: "error", text: json.error || "Falha ao carregar órfãos." });
-    } catch {
-      showToast({ type: "error", text: "Servidor indisponível." });
+      if (res.ok) {
+        setOrphans(Array.isArray(json.orphans) ? json.orphans : []);
+        if (Array.isArray(json.orphans) && json.orphans.length === 0) {
+          showToast({ type: "info", text: "Backend respondeu vazio. Confira o Debug se isso parecer errado." });
+        }
+      } else {
+        showToast({ type: "error", text: json.error || `Falha HTTP ${res.status}.` });
+      }
+    } catch (e: any) {
+      showToast({ type: "error", text: `Servidor indisponível: ${e?.message || e}` });
     }
     setLoading(false);
+  };
+
+  const identifyAll = async () => {
+    if (orphans.length === 0) return;
+    setIdentifying(true);
+    try {
+      // Pode demorar minutos com 300+ PDFs. Usuario foi avisado.
+      const res = await fetch("/api/admin/orphans?parse=true");
+      const json = await res.json();
+      if (res.ok) {
+        setOrphans(Array.isArray(json.orphans) ? json.orphans : []);
+        setIdentified(true);
+        showToast({ type: "success", text: "Arquivos identificados com sucesso." });
+      } else {
+        showToast({ type: "error", text: json.error || "Falha ao identificar arquivos." });
+      }
+    } catch (e: any) {
+      showToast({ type: "error", text: `Falha ao identificar: ${e?.message || e}. Pode ter dado timeout — tente baixar o ZIP, que tem o parse com cache.` });
+    }
+    setIdentifying(false);
   };
 
   useEffect(() => {
@@ -101,7 +132,10 @@ export default function AdminOrphansPage() {
   };
 
   const downloadAllZip = () => {
-    window.location.href = `/api/admin/orphans/download-all?status=${filter}`;
+    // Se já identificou nesta sessão, o cache do servidor está quente — vale parsear
+    // pra ZIP sair com nomes amigáveis. Senão pula parse pra evitar timeout.
+    const parseQs = identified ? "&parse=true" : "";
+    window.location.href = `/api/admin/orphans/download-all?status=${filter}${parseQs}`;
   };
 
   const openDebug = async () => {
@@ -212,14 +246,24 @@ export default function AdminOrphansPage() {
                 <option value="SEM_ASSINATURA">Só sem assinatura</option>
               </select>
             </div>
-            <button
-              onClick={downloadAllZip}
-              disabled={filtered.length === 0}
-              className="bg-emerald-500 hover:bg-emerald-400 text-[#070708] font-bold py-2.5 px-5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all active:scale-[0.98] text-xs uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
-              title={filtered.length === 0 ? "Nada pra baixar" : "Baixar todos como ZIP organizado por pastas"}
-            >
-              ⬇ Baixar todos ({filtered.length}) como ZIP
-            </button>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={identifyAll}
+                disabled={identifying || orphans.length === 0 || identified}
+                className="bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-400 font-bold py-2.5 px-5 rounded-xl ring-1 ring-blue-500/30 transition-all text-xs uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+                title={identified ? "Já identificados nesta sessão" : "Lê cada PDF para extrair nome, CPF e competência. Pode demorar com muitos arquivos."}
+              >
+                {identifying ? "Identificando..." : identified ? "✓ Identificados" : `🔍 Identificar arquivos (${orphans.length})`}
+              </button>
+              <button
+                onClick={downloadAllZip}
+                disabled={filtered.length === 0}
+                className="bg-emerald-500 hover:bg-emerald-400 text-[#070708] font-bold py-2.5 px-5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all active:scale-[0.98] text-xs uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+                title={filtered.length === 0 ? "Nada pra baixar" : "Baixar todos como ZIP organizado por pastas"}
+              >
+                ⬇ Baixar todos ({filtered.length}) como ZIP
+              </button>
+            </div>
           </div>
 
           {filtered.length === 0 ? (

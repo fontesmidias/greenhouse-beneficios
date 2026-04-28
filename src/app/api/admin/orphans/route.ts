@@ -4,19 +4,29 @@ import { requireAdmin } from "@/lib/authz";
 import { listOrphans, safeOrphanPath, UPLOADS_DIR } from "@/lib/orphans";
 import { parseMany } from "@/lib/pdfParse";
 
-export async function GET() {
+export async function GET(req: Request) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
   try {
+    const { searchParams } = new URL(req.url);
+    // Parse de PDF é opcional e desligado por padrão. Volumes grandes (300+ PDFs)
+    // estouram o timeout do Traefik se parsearem tudo na chamada inicial.
+    // UI carrega lista rápida primeiro, depois pede parse via ?parse=true.
+    const shouldParse = searchParams.get("parse") === "true";
+
     const orphans = listOrphans();
-    // Parse em paralelo limitado (5 simultâneos) com cache por mtime
+
+    if (!shouldParse) {
+      return NextResponse.json({ count: orphans.length, orphans, parsed: false });
+    }
+
     const parsedMap = await parseMany(orphans, UPLOADS_DIR, 5);
     const enriched = orphans.map((o) => ({
       ...o,
       parsed: parsedMap.get(o.filename) || undefined,
     }));
-    return NextResponse.json({ count: enriched.length, orphans: enriched });
+    return NextResponse.json({ count: enriched.length, orphans: enriched, parsed: true });
   } catch (error: any) {
     console.error("[admin/orphans] erro ao listar", error);
     return NextResponse.json({ error: "Falha ao listar arquivos órfãos." }, { status: 500 });
