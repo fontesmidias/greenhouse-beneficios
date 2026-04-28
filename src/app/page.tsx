@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { BulkReceiptSelector } from '../components/BulkReceiptSelector';
 import { LinkModal } from '../components/LinkModal';
+import Tooltip from '../components/Tooltip';
 export default function Home() {
   const { data: session } = useSession();
   const [uploading, setUploading] = useState(false);
@@ -351,7 +352,23 @@ export default function Home() {
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
               
               <div className="flex justify-between items-center mb-2 relative z-10">
-                <h2 className="text-xl font-bold text-white tracking-tight">Ingestão de Base</h2>
+                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  Ingestão de Base
+                  <Tooltip
+                    ariaLabel="Como funciona o upload de planilha"
+                    content={(
+                      <>
+                        <strong className="text-emerald-400 block mb-1">Formatos aceitos por coluna:</strong>
+                        <ul className="space-y-1 list-disc list-inside">
+                          <li><b>NOME / CPF:</b> obrigatórios. CPF aceita com ou sem pontuação.</li>
+                          <li><b>Datas (Período VA-VT):</b> DD/MM/AAAA, AAAA-MM-DD, ou célula formatada como Data no Excel — não precisa formatar como texto.</li>
+                          <li><b>Valores monetários:</b> "46,38", "46.38", "R$ 1.234,56" ou fórmulas (=E2*F2).</li>
+                          <li><b>E-mail / WhatsApp:</b> pelo menos um dos dois para envio do recibo.</li>
+                        </ul>
+                      </>
+                    )}
+                  />
+                </h2>
                 <a href="/api/template" download="Template_Beneficios_Oficial.xlsx" className="flex items-center gap-1.5 text-[10px] font-bold text-[#0A0A0B] bg-emerald-400 hover:bg-emerald-300 py-1.5 px-3 rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] uppercase tracking-wide">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                   Modelo Excel
@@ -418,15 +435,36 @@ export default function Home() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0A0A0B] p-4 rounded-2xl ring-1 ring-white/5 border border-white/5">
                    <div>
-                     <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1.5">Intervalo Min. (Segs)</label>
+                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-1.5 flex items-center gap-1.5">
+                       Intervalo Min. (Segs)
+                       <Tooltip
+                         side="bottom"
+                         ariaLabel="O que é o intervalo mínimo"
+                         content="Tempo mínimo (em segundos) entre dois envios consecutivos. Use valores acima de 3s para reduzir risco de bloqueio do WhatsApp."
+                       />
+                     </label>
                      <input type="number" min={1} value={intervalMin} onChange={e => setIntervalMin(Number(e.target.value))} className="w-full bg-[#111113] border border-white/5 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
                    </div>
                    <div>
-                     <label className="block text-[9px] font-bold text-zinc-500 uppercase mb-1.5">Intervalo Max. (Segs)</label>
+                     <label className="text-[9px] font-bold text-zinc-500 uppercase mb-1.5 flex items-center gap-1.5">
+                       Intervalo Max. (Segs)
+                       <Tooltip
+                         side="bottom"
+                         ariaLabel="O que é o intervalo máximo"
+                         content="Tempo máximo (em segundos) entre dois envios. O sistema sorteia um valor aleatório entre min e max para parecer natural e evitar padrão de robô."
+                       />
+                     </label>
                      <input type="number" min={2} value={intervalMax} onChange={e => setIntervalMax(Number(e.target.value))} className="w-full bg-[#111113] border border-white/5 rounded-lg px-3 py-2 text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
                    </div>
                    <div>
-                     <label className="block text-[9px] font-bold text-emerald-500/70 uppercase mb-1.5">Agendar Disparo Lote (Opcional)</label>
+                     <label className="text-[9px] font-bold text-emerald-500/70 uppercase mb-1.5 flex items-center gap-1.5">
+                       Agendar Disparo Lote (Opcional)
+                       <Tooltip
+                         side="bottom"
+                         ariaLabel="Como funciona o agendamento"
+                         content="Data e hora futura para iniciar o disparo do lote. Vazio = enviar agora. Útil para programar envios em horário comercial."
+                       />
+                     </label>
                      <input type="datetime-local" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} className="w-full bg-[#111113] border border-emerald-500/20 rounded-lg px-3 py-2 text-emerald-400 text-xs focus:ring-1 focus:ring-emerald-500 outline-none" />
                    </div>
                 </div>
@@ -450,13 +488,26 @@ export default function Home() {
                   <h2 className="text-lg font-bold text-white tracking-tight">Acervo de Lotes</h2>
                 </div>
                 <div className="flex gap-4 items-center">
-                  <input 
-                     type="text" 
-                     placeholder="Buscar por nome ou CPF..." 
-                     value={searchQuery}
-                     onChange={(e) => setSearchQuery(e.target.value)}
-                     className="bg-[#0A0A0B] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all w-64"
-                  />
+                  <div className="relative flex items-center gap-1.5">
+                    <input
+                       type="text"
+                       placeholder="Buscar por nome ou CPF..."
+                       value={searchQuery}
+                       onChange={(e) => setSearchQuery(e.target.value)}
+                       className="bg-[#0A0A0B] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all w-64"
+                    />
+                    <Tooltip
+                      side="bottom"
+                      ariaLabel="Como funciona a busca"
+                      content={(
+                        <>
+                          <strong className="text-emerald-400 block mb-1">Busca</strong>
+                          Aceita nome parcial ou CPF (com ou sem pontuação).
+                          A busca é instantânea e ignora maiúsculas/minúsculas.
+                        </>
+                      )}
+                    />
+                  </div>
                   <button onClick={fetchLots} className="p-2.5 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all border border-white/5" title="Recarregar">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                   </button>
