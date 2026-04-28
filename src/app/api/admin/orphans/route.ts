@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import { requireAdmin } from "@/lib/authz";
-import { listOrphans, safeOrphanPath } from "@/lib/orphans";
+import { listOrphans, safeOrphanPath, UPLOADS_DIR } from "@/lib/orphans";
+import { parseMany } from "@/lib/pdfParse";
 
 export async function GET() {
   const denied = await requireAdmin();
@@ -9,7 +10,13 @@ export async function GET() {
 
   try {
     const orphans = listOrphans();
-    return NextResponse.json({ count: orphans.length, orphans });
+    // Parse em paralelo limitado (5 simultâneos) com cache por mtime
+    const parsedMap = await parseMany(orphans, UPLOADS_DIR, 5);
+    const enriched = orphans.map((o) => ({
+      ...o,
+      parsed: parsedMap.get(o.filename) || undefined,
+    }));
+    return NextResponse.json({ count: enriched.length, orphans: enriched });
   } catch (error: any) {
     console.error("[admin/orphans] erro ao listar", error);
     return NextResponse.json({ error: "Falha ao listar arquivos órfãos." }, { status: 500 });

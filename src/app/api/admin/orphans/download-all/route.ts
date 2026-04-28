@@ -4,6 +4,7 @@ import path from "path";
 import JSZip from "jszip";
 import { requireAdmin } from "@/lib/authz";
 import { listOrphans, UPLOADS_DIR, buildDownloadFilename } from "@/lib/orphans";
+import { parseMany } from "@/lib/pdfParse";
 
 export async function GET(req: Request) {
   const denied = await requireAdmin();
@@ -22,13 +23,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Nenhum arquivo órfão para o filtro selecionado." }, { status: 404 });
     }
 
+    // Parse metadata (cache hit é instantâneo após primeira listagem)
+    const parsedMap = await parseMany(orphans, UPLOADS_DIR, 5);
+
     const zip = new JSZip();
     for (const o of orphans) {
       const folder = o.status === "ASSINADO" ? "ASSINADOS" : "SEM_ASSINATURA";
       const fullPath = path.join(UPLOADS_DIR, o.filename);
       try {
         const data = fs.readFileSync(fullPath);
-        const friendlyName = buildDownloadFilename(o.filename, o.status);
+        const parsed = parsedMap.get(o.filename) || undefined;
+        const friendlyName = buildDownloadFilename(o.filename, o.status, parsed || undefined);
         zip.file(`${folder}/${friendlyName}`, data);
       } catch (e) {
         console.warn("[admin/orphans/download-all] arquivo sumiu durante zip", o.filename);
