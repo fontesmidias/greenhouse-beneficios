@@ -12,8 +12,8 @@ services:
       - NODE_ENV=production
       - NEXT_PUBLIC_BASE_URL=https://${DOMAIN}
       # Conexão interna apontando para o serviço de banco 'db'
-      - DATABASE_URL=postgresql://greenhouseAdmin:MudarSenhaSegura123@db:5432/greenhouse_db?schema=public
-      - NEXTAUTH_SECRET=sua_senha_segura_aqui_123
+      - DATABASE_URL=postgresql://greenhouseAdmin:${DB_PASSWORD}@db:5432/greenhouse_db?schema=public
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://${DOMAIN}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
@@ -47,7 +47,7 @@ services:
       - unibotnet
     environment:
       - POSTGRES_USER=greenhouseAdmin
-      - POSTGRES_PASSWORD=MudarSenhaSegura123
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=greenhouse_db
     volumes:
       - greenhouse_pg_data:/var/lib/postgresql/data
@@ -55,7 +55,69 @@ services:
       restart_policy:
         condition: on-failure
 
-  # 3. Portainer Exclusivo desta Aplicação (Porta 9005 e 9445)
+  # 3. Backup automático do PostgreSQL
+  # Imagem padrão de mercado: prodrigestivill/postgres-backup-local
+  # Faz pg_dump agendado, comprime gzip, mantém rotação diária/semanal/mensal.
+  # Restore documentado em docs/RESTORE.md
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:15
+    networks:
+      - unibotnet
+    volumes:
+      - greenhouse_pg_backups:/backups
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: greenhouse_db
+      POSTGRES_USER: greenhouseAdmin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_EXTRA_OPTS: "-Z 6 --schema=public --blobs"
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 14
+      BACKUP_KEEP_WEEKS: 8
+      BACKUP_KEEP_MONTHS: 12
+      HEALTHCHECK_PORT: 8080
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - db
+
+  # 4. Backup OFFSITE para Backblaze B2 (opcional)
+  # Sincroniza /backups (volume local de dumps) → bucket B2 a cada hora.
+  # Só ativa se as env B2_* estiverem preenchidas no .env. Caso contrário,
+  # o container loga erro e fica reiniciando — comente este service inteiro
+  # se ainda não tiver conta B2 configurada.
+  # Setup: docs/OFFSITE_BACKUP.md
+  db-backup-offsite:
+    image: rclone/rclone:latest
+    networks:
+      - unibotnet
+    volumes:
+      - greenhouse_pg_backups:/data/backups:ro
+    environment:
+      RCLONE_CONFIG_B2_TYPE: b2
+      RCLONE_CONFIG_B2_ACCOUNT: ${B2_ACCOUNT_ID}
+      RCLONE_CONFIG_B2_KEY: ${B2_APPLICATION_KEY}
+      RCLONE_CONFIG_B2_HARD_DELETE: "true"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Sync de backups DB → B2 ativo. Intervalo: 1h."
+        while true; do
+          echo "[$(date -Iseconds)] Iniciando sync para b2:${B2_BUCKET}/greenhouse-pg-backups"
+          rclone sync /data/backups b2:${B2_BUCKET}/greenhouse-pg-backups \
+            --transfers 4 --checkers 8 --log-level INFO || echo "Sync falhou — tentaremos de novo em 1h"
+          echo "[$(date -Iseconds)] Sync concluído. Dormindo 1h."
+          sleep 3600
+        done
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - db-backup
+
+  # 5. Portainer Exclusivo desta Aplicação (Porta 9005 e 9445)
   portainer-greenhouse:
     image: portainer/portainer-ce:latest
     command: -H unix:///var/run/docker.sock
@@ -74,6 +136,7 @@ services:
 
 volumes:
   greenhouse_pg_data:
+  greenhouse_pg_backups:
   greenhouse_uploads:
   portainer_greenhouse_data:
 

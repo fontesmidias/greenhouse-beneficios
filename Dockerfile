@@ -36,5 +36,8 @@ EXPOSE 3000
 
 ENV PORT=3000
 
-# Next.js standalone runner com Startup Push e Skip Generate (para não quebrar no standalone enxuto)
-CMD npx prisma db push --skip-generate && node server.js
+# Next.js standalone runner.
+# Aplica migrations versionadas (idempotente, não destrutivo) antes de subir o server.
+# NUNCA voltar para `prisma db push` — esse comando é de prototipagem e dropa colunas
+# em mudanças incompatíveis de schema. Runbook do incidente: docs/ROLLOUT_FIX_DBPUSH.md
+CMD npx prisma migrate deploy && node server.js
