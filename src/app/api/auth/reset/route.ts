@@ -14,12 +14,14 @@ export async function POST(req: Request) {
       where: { resetToken: token }
     });
 
-    if (!user || !user.resetTokenExpiry) {
-      return NextResponse.json({ error: "Token inválido ou expirado." }, { status: 400 });
+    if (!user) {
+      return NextResponse.json({ error: "Token inválido ou já utilizado." }, { status: 400 });
     }
 
-    if (new Date() > user.resetTokenExpiry) {
-      return NextResponse.json({ error: "O link de recuperação expirou (1 hora). Solicite novamente." }, { status: 400 });
+    // resetTokenExpiry === null significa "não expira" (criado pelo admin via /api/admin/users).
+    // Para tokens com expiry definido (fluxo /forgot), valida o prazo normalmente.
+    if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+      return NextResponse.json({ error: "O link de recuperação expirou. Solicite novamente." }, { status: 400 });
     }
 
     const hashedSenha = await bcrypt.hash(novaSenha, 12);
