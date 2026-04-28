@@ -87,7 +87,10 @@ export default function AdminSettingsPage() {
             <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Engrenagens da Plataforma</h1>
             <p className="text-zinc-400 text-sm">Gerencie múltiplos servidores SMTP e instâncias roteadoras do WhatsApp (Evo).</p>
           </div>
-          <a href="/" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Retornar ao Painel Operacional</a>
+          <div className="flex gap-3">
+            <a href="/admin/users" className="bg-emerald-500/10 hover:bg-emerald-500 hover:text-[#070708] text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-emerald-500/30 uppercase tracking-widest">Gerenciar Usuários</a>
+            <a href="/" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Retornar ao Painel Operacional</a>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
