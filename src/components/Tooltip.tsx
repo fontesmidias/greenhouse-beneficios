@@ -1,24 +1,32 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+
+type Side = "top" | "bottom" | "left" | "right";
 
 type TooltipProps = {
   content: React.ReactNode;
   /** Texto curto para leitores de tela quando o conteúdo é longo. */
   ariaLabel?: string;
   /** Lado preferencial do balão. Default: top. */
-  side?: "top" | "bottom" | "left" | "right";
+  side?: Side;
   /** Tamanho do ícone em pixels. Default: 14. */
   iconSize?: number;
   className?: string;
 };
 
+const GAP = 8;
+
 /**
  * Tooltip discreto com ícone "ⓘ".
+ * - Renderiza em portal (document.body) para não ser cortado por overflow.
  * - Hover (desktop) e tap (touch) abrem
  * - Foco por teclado (Tab) também abre
  * - Esc fecha
  * - Fecha ao clicar fora
+ * - Reposiciona automaticamente em scroll/resize
+ * - Em telas pequenas, ajusta para caber na viewport
  */
 export default function Tooltip({
   content,
@@ -28,36 +36,122 @@ export default function Tooltip({
   className = "",
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; placedSide: Side } | null>(null);
+
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const balloonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    setMounted(true);
+  }, []);
+
+  const computePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const balloon = balloonRef.current;
+    if (!trigger || !balloon) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const balloonRect = balloon.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let placedSide: Side = side;
+    let top = 0;
+    let left = 0;
+
+    const computeFor = (s: Side) => {
+      switch (s) {
+        case "top":
+          return {
+            top: triggerRect.top - balloonRect.height - GAP,
+            left: triggerRect.left + triggerRect.width / 2 - balloonRect.width / 2,
+          };
+        case "bottom":
+          return {
+            top: triggerRect.bottom + GAP,
+            left: triggerRect.left + triggerRect.width / 2 - balloonRect.width / 2,
+          };
+        case "left":
+          return {
+            top: triggerRect.top + triggerRect.height / 2 - balloonRect.height / 2,
+            left: triggerRect.left - balloonRect.width - GAP,
+          };
+        case "right":
+          return {
+            top: triggerRect.top + triggerRect.height / 2 - balloonRect.height / 2,
+            left: triggerRect.right + GAP,
+          };
+      }
+    };
+
+    let pos = computeFor(placedSide);
+    const fitsVertically = pos.top >= 0 && pos.top + balloonRect.height <= vh;
+    const fitsHorizontally = pos.left >= 0 && pos.left + balloonRect.width <= vw;
+
+    // Auto-flip quando estoura a viewport
+    if (placedSide === "top" && !fitsVertically) {
+      placedSide = "bottom";
+      pos = computeFor(placedSide);
+    } else if (placedSide === "bottom" && !fitsVertically) {
+      placedSide = "top";
+      pos = computeFor(placedSide);
+    } else if (placedSide === "left" && !fitsHorizontally) {
+      placedSide = "right";
+      pos = computeFor(placedSide);
+    } else if (placedSide === "right" && !fitsHorizontally) {
+      placedSide = "left";
+      pos = computeFor(placedSide);
+    }
+
+    // Clamp horizontal: nunca sair da tela
+    left = Math.max(8, Math.min(pos.left, vw - balloonRect.width - 8));
+    top = Math.max(8, Math.min(pos.top, vh - balloonRect.height - 8));
+
+    setCoords({ top, left, placedSide });
+  }, [side]);
+
+  useEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+    // Primeiro render do balão pra medir, depois posicionar
+    requestAnimationFrame(computePosition);
+
+    const onScroll = () => computePosition();
+    const onResize = () => computePosition();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
     const onClick = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        balloonRef.current?.contains(target)
+      ) {
+        return;
       }
+      setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onClick);
+
     return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onClick);
     };
-  }, [open]);
-
-  const positionClasses: Record<NonNullable<TooltipProps["side"]>, string> = {
-    top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
-    bottom: "top-full left-1/2 -translate-x-1/2 mt-2",
-    left: "right-full top-1/2 -translate-y-1/2 mr-2",
-    right: "left-full top-1/2 -translate-y-1/2 ml-2",
-  };
+  }, [open, computePosition]);
 
   return (
-    <span ref={wrapperRef} className={`relative inline-flex items-center ${className}`}>
+    <span className={`relative inline-flex items-center ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel || "Mais informações"}
         aria-expanded={open}
@@ -84,14 +178,26 @@ export default function Tooltip({
         </svg>
       </button>
 
-      {open && (
-        <span
-          role="tooltip"
-          className={`absolute z-50 ${positionClasses[side]} w-64 max-w-[80vw] bg-[#0A0A0B] text-zinc-200 text-[11px] leading-relaxed font-medium px-3 py-2.5 rounded-xl shadow-2xl ring-1 ring-emerald-500/20 border border-white/5 pointer-events-none`}
-        >
-          {content}
-        </span>
-      )}
+      {mounted && open &&
+        createPortal(
+          <div
+            ref={balloonRef}
+            role="tooltip"
+            style={{
+              position: "fixed",
+              top: coords?.top ?? -9999,
+              left: coords?.left ?? -9999,
+              maxWidth: "min(20rem, calc(100vw - 16px))",
+              opacity: coords ? 1 : 0,
+              pointerEvents: "none",
+              zIndex: 9999,
+            }}
+            className="bg-[#0A0A0B] text-zinc-200 text-[11px] leading-relaxed font-medium px-3 py-2.5 rounded-xl shadow-2xl ring-1 ring-emerald-500/20 border border-white/5 transition-opacity duration-100"
+          >
+            {content}
+          </div>,
+          document.body
+        )}
     </span>
   );
 }
