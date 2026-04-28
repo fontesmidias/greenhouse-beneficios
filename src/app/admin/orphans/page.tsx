@@ -32,6 +32,18 @@ export default function AdminOrphansPage() {
   const [filter, setFilter] = useState<StatusFilter>("ALL");
   const [toast, setToast] = useState<Toast>(null);
 
+  // Debug modal
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
+
+  // Send-email modal
+  const [emailModalFor, setEmailModalFor] = useState<Orphan | null>(null);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const showToast = (t: NonNullable<Toast>) => {
     setToast(t);
     setTimeout(() => setToast(null), 5000);
@@ -92,6 +104,64 @@ export default function AdminOrphansPage() {
     window.location.href = `/api/admin/orphans/download-all?status=${filter}`;
   };
 
+  const openDebug = async () => {
+    setDebugOpen(true);
+    setDebugLoading(true);
+    setDebugData(null);
+    try {
+      const res = await fetch("/api/admin/orphans/debug");
+      const json = await res.json();
+      setDebugData(json);
+    } catch (e: any) {
+      setDebugData({ error: e?.message || "Falha ao carregar debug" });
+    }
+    setDebugLoading(false);
+  };
+
+  const openEmailModal = (o: Orphan) => {
+    setEmailModalFor(o);
+    setEmailTo("");
+    setEmailMessage("");
+    setEmailResult(null);
+  };
+
+  const closeEmailModal = () => {
+    if (emailSending) return;
+    setEmailModalFor(null);
+    setEmailResult(null);
+  };
+
+  const submitEmail = async () => {
+    if (!emailModalFor) return;
+    if (!emailTo.trim()) {
+      setEmailResult({ success: false, message: "Informe o e-mail destinatário." });
+      return;
+    }
+    setEmailSending(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch("/api/admin/orphans/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          file: emailModalFor.filename,
+          to: emailTo.trim(),
+          message: emailMessage.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setEmailResult({ success: true, message: `Enviado para ${json.sentTo} como "${json.filename}".` });
+        showToast({ type: "success", text: `Recibo enviado para ${json.sentTo}.` });
+      } else {
+        setEmailResult({ success: false, message: json.error || "Falha desconhecida no envio." });
+      }
+    } catch (e: any) {
+      setEmailResult({ success: false, message: e?.message || "Servidor indisponível." });
+    }
+    setEmailSending(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#070708] p-8 text-white font-sans selection:bg-emerald-500/30">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -106,6 +176,7 @@ export default function AdminOrphansPage() {
             <p className="text-zinc-400 text-sm">PDFs no volume Docker que perderam o registro no banco. Baixe ou apague conforme necessário.</p>
           </div>
           <div className="flex gap-3 flex-wrap">
+            <button onClick={openDebug} className="bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-amber-500/30 uppercase tracking-widest text-amber-400" title="Inspecionar estado do servidor (paths, contagens)">🔧 Debug</button>
             <a href="/admin/users" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Gerenciar Usuários</a>
             <a href="/admin/settings" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Engrenagens</a>
             <a href="/" className="bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ring-1 ring-white/10 uppercase tracking-widest text-zinc-300">Painel Operacional</a>
@@ -194,13 +265,19 @@ export default function AdminOrphansPage() {
                       <td className="py-3 pr-4 text-zinc-500 text-xs hidden lg:table-cell">{formatBytes(o.size)}</td>
                       <td className="py-3 pr-4 text-zinc-500 text-xs font-mono hidden lg:table-cell">{formatDate(o.modifiedAt)}</td>
                       <td className="py-3 text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 flex-wrap">
                           <a
                             href={`/api/admin/orphans/download?file=${encodeURIComponent(o.filename)}`}
                             className="bg-sky-500/10 hover:bg-sky-500 hover:text-white text-sky-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ring-1 ring-sky-500/30 transition-all"
                           >
                             Baixar
                           </a>
+                          <button
+                            onClick={() => openEmailModal(o)}
+                            className="bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ring-1 ring-blue-500/30 transition-all"
+                          >
+                            Enviar por e-mail
+                          </button>
                           <button
                             onClick={() => deleteOrphan(o.filename)}
                             className="bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ring-1 ring-rose-500/30 transition-all"
@@ -221,6 +298,92 @@ export default function AdminOrphansPage() {
       {toast && (
         <div className={`fixed bottom-6 right-6 max-w-sm px-5 py-4 rounded-2xl shadow-2xl ring-1 backdrop-blur-md z-50 ${toast.type === "success" ? "bg-emerald-500/90 ring-emerald-400 text-[#070708]" : toast.type === "error" ? "bg-rose-600/90 ring-rose-500 text-white" : "bg-blue-500/90 ring-blue-400 text-white"}`}>
           <div className="text-sm font-bold">{toast.text}</div>
+        </div>
+      )}
+
+      {debugOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDebugOpen(false)}>
+          <div className="bg-[#111113] border border-white/10 rounded-[2rem] p-8 max-w-3xl w-full max-h-[85vh] overflow-auto shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50"></div>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-amber-400 mb-1">🔧 Diagnóstico do servidor</h2>
+                <p className="text-xs text-zinc-500">Estado real visto pelo backend. Útil pra investigar quando a tela mostra 0 mas o volume tem arquivos.</p>
+              </div>
+              <button onClick={() => setDebugOpen(false)} className="text-zinc-500 hover:text-white text-2xl leading-none">×</button>
+            </div>
+            {debugLoading ? (
+              <div className="text-zinc-400 animate-pulse py-8 text-center">Carregando diagnóstico...</div>
+            ) : (
+              <pre className="bg-[#0A0A0B] border border-white/5 rounded-xl p-4 text-[11px] font-mono text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(debugData, null, 2)}</pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {emailModalFor && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEmailModal}>
+          <div className="bg-[#111113] border border-white/10 rounded-[2rem] p-8 max-w-md w-full shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+            <h2 className="text-xl font-bold mb-2 text-blue-400">Enviar arquivo por e-mail</h2>
+            <p className="text-xs text-zinc-500 mb-2">
+              Arquivo: <span className="font-mono text-zinc-400">{emailModalFor.parsed?.nome || emailModalFor.filename}</span>
+            </p>
+            {emailModalFor.parsed?.competencia && (
+              <p className="text-[10px] text-zinc-600 mb-4">Competência detectada: {emailModalFor.parsed.competencia}</p>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">E-mail destinatário</label>
+                <input
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  type="email"
+                  placeholder="colaborador@empresa.com"
+                  disabled={emailSending}
+                  className="w-full bg-[#161618] border border-transparent rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Mensagem (opcional)</label>
+                <textarea
+                  value={emailMessage}
+                  onChange={(e) => setEmailMessage(e.target.value)}
+                  placeholder="Deixe em branco para usar a mensagem padrão."
+                  disabled={emailSending}
+                  rows={4}
+                  className="w-full bg-[#161618] border border-transparent rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs resize-y"
+                />
+              </div>
+
+              {emailResult && (
+                <div className={`p-3 rounded-xl text-xs font-medium ring-1 ${emailResult.success ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30" : "bg-rose-500/10 text-rose-300 ring-rose-500/30"}`}>
+                  <div className="font-bold mb-1">{emailResult.success ? "✓ Sucesso" : "✗ Falha"}</div>
+                  <div className="break-words">{emailResult.message}</div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeEmailModal}
+                  disabled={emailSending}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-zinc-300 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wide transition-all"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={submitEmail}
+                  disabled={emailSending}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.2)] transition-all active:scale-[0.98] text-xs uppercase tracking-wide disabled:opacity-50"
+                >
+                  {emailSending ? "Enviando..." : "Enviar agora"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
