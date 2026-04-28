@@ -370,6 +370,9 @@ export default function Home() {
               <div className="flex gap-2">
                 { (session.user as any).role === 'ADMIN' && (
                   <>
+                    <a href="/admin/orphans" className="w-8 h-8 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 transition-all ring-1 ring-amber-500/20" title="Arquivos órfãos no volume (Admin)">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </a>
                     <a href="/admin/users" className="w-8 h-8 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 transition-all ring-1 ring-emerald-500/20" title="Gerenciar Usuários (Admin)">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     </a>
