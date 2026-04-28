@@ -18,6 +18,8 @@ export default function Home() {
   const [sortKey, setSortKey] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'PENDENTE' | 'ASSINADO'>('');
+  const [competenciaFilter, setCompetenciaFilter] = useState<string>('');
   
   // Dispatch advanced settings & polling
   const [intervalMin, setIntervalMin] = useState<number>(3);
@@ -230,7 +232,14 @@ export default function Home() {
     let filtered = receipts;
     if (searchQuery.trim().length > 0) {
        const q = searchQuery.toLowerCase();
-       filtered = receipts.filter(r => (r.nome?.toLowerCase().includes(q) || r.cpf?.includes(q)));
+       filtered = filtered.filter(r => (r.nome?.toLowerCase().includes(q) || r.cpf?.includes(q)));
+    }
+    if (statusFilter) {
+       filtered = filtered.filter(r => r.status === statusFilter);
+    }
+    if (competenciaFilter.trim().length > 0) {
+       const cf = competenciaFilter.trim();
+       filtered = filtered.filter(r => (r.competencia || '').includes(cf));
     }
     return [...filtered].sort((a, b) => {
       let valA = a[sortKey] || '';
@@ -487,7 +496,7 @@ export default function Home() {
                 <div>
                   <h2 className="text-lg font-bold text-white tracking-tight">Acervo de Lotes</h2>
                 </div>
-                <div className="flex gap-4 items-center">
+                <div className="flex flex-wrap gap-3 items-center">
                   <div className="relative flex items-center gap-1.5">
                     <input
                        type="text"
@@ -504,6 +513,48 @@ export default function Home() {
                           <strong className="text-emerald-400 block mb-1">Busca</strong>
                           Aceita nome parcial ou CPF (com ou sem pontuação).
                           A busca é instantânea e ignora maiúsculas/minúsculas.
+                        </>
+                      )}
+                    />
+                  </div>
+                  <div className="relative flex items-center gap-1.5">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      className="bg-[#0A0A0B] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                    >
+                      <option value="">Todos os status</option>
+                      <option value="PENDENTE">Pendente</option>
+                      <option value="ASSINADO">Assinado</option>
+                    </select>
+                    <Tooltip
+                      side="bottom"
+                      ariaLabel="O que cada status significa"
+                      content={(
+                        <>
+                          <strong className="text-emerald-400 block mb-1">Status do recibo</strong>
+                          <b>PENDENTE</b> = aguardando assinatura do colaborador.<br />
+                          <b>ASSINADO</b> = colaborador já assinou.
+                        </>
+                      )}
+                    />
+                  </div>
+                  <div className="relative flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Competência (MM/AAAA)"
+                      value={competenciaFilter}
+                      onChange={(e) => setCompetenciaFilter(e.target.value)}
+                      className="bg-[#0A0A0B] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all w-44"
+                    />
+                    <Tooltip
+                      side="bottom"
+                      ariaLabel="Como filtrar por competência"
+                      content={(
+                        <>
+                          <strong className="text-emerald-400 block mb-1">Competência</strong>
+                          Mês/ano de referência do benefício (ex.: <b>05/2026</b>).
+                          Aceita parte: digite só <b>2026</b> para todas as competências do ano. Vazio = todas.
                         </>
                       )}
                     />
@@ -553,7 +604,13 @@ export default function Home() {
                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
                                  <h3 className="text-[11px] font-bold text-white uppercase tracking-widest leading-none">CMPT {lot.competencia}</h3>
                                </div>
-                               <span className="text-[9px] font-medium text-zinc-500">{selectedInLot.length} de {lot.total} selecionados</span>
+                               <span className="text-[9px] font-medium text-zinc-500">
+                                 {selectedInLot.length} de {lot.total} selecionados
+                                 {(statusFilter || competenciaFilter || searchQuery) && (() => {
+                                   const visiveis = filterAndSortReceipts(lot.receipts).length;
+                                   return ` · ${visiveis} de ${lot.total} visíveis com filtro`;
+                                 })()}
+                               </span>
                             </div>
                           </div>
                           
