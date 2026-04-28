@@ -5,6 +5,12 @@ import { logger } from '../../../lib/logger';
 import { db } from '../../../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { generateReceiptPDF } from '../../../lib/pdf';
+import {
+  normalizeDate,
+  formatCompetencia,
+  normalizeAndFormatMoney,
+  formatDateBR,
+} from '../../../lib/spreadsheet';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,15 +29,49 @@ export async function POST(req: NextRequest) {
     db.cleanup(30);
 
     let successCount = 0;
+    const skipped: { row: number; reason: string }[] = [];
 
-    for (const record of records) {
-      if (!record.NOME || !record.CPF) continue;
+    for (let idx = 0; idx < records.length; idx++) {
+      const record = records[idx];
+      const rowNumber = idx + 2; // +1 zero-index, +1 cabeçalho da planilha
+
+      if (!record.NOME || !record.CPF) {
+        const reason = 'Linha ignorada: NOME ou CPF ausente.';
+        logger.warn(reason, { row: rowNumber, nome: record.NOME, cpf: record.CPF });
+        skipped.push({ row: rowNumber, reason });
+        continue;
+      }
 
       const receiptId = uuidv4();
       const magicToken = uuidv4();
-      
-      const competenciaVal = record['Competência'] || record['Periodo VA-VT início']?.substring(3) || 'Atual';
-      const dataAtualStr = record['DATA ASSINATURA DO RECIBO'] || new Date().toLocaleDateString('pt-BR');
+
+      // Cálculo da competência tolerante a qualquer formato de data:
+      // serial Excel, DD/MM/AAAA, ISO, "01 de maio de 2026", etc.
+      const dataInicio = normalizeDate(record['Periodo VA-VT início']);
+      const competenciaVal =
+        record['Competência'] ||
+        formatCompetencia(dataInicio) ||
+        'Atual';
+
+      if (!record['Competência'] && !dataInicio) {
+        logger.warn('Competência não pôde ser deduzida — usando "Atual" como fallback', {
+          row: rowNumber,
+          nome: record.NOME,
+          cpf: record.CPF,
+          rawValue: record['Periodo VA-VT início'],
+        });
+      }
+
+      // Data de assinatura: aceita string livre OU data normalizável
+      let dataAtualStr: string;
+      if (record['DATA ASSINATURA DO RECIBO']) {
+        const parsed = normalizeDate(record['DATA ASSINATURA DO RECIBO']);
+        dataAtualStr = parsed
+          ? formatDateBR(parsed) || String(record['DATA ASSINATURA DO RECIBO'])
+          : String(record['DATA ASSINATURA DO RECIBO']);
+      } else {
+        dataAtualStr = new Date().toLocaleDateString('pt-BR');
+      }
 
       const receipt = {
         id: receiptId,
@@ -44,44 +84,37 @@ export async function POST(req: NextRequest) {
         magicLinkToken: magicToken,
         createdAt: new Date().toISOString()
       };
-      
+
       db.addReceipt(receipt);
 
-      const formatMoney = (val: any) => {
-        if (val === undefined || val === null || String(val).trim() === '') return 'R$ 0,00';
-        
-        let numValue = val;
-        if (typeof val === 'string') {
-          if (val.toUpperCase().includes('R$')) return val; // Already formatted
-          
-          // Assume text number (e.g., '48.3' or '48,3'). To parse as float safely:
-          // Keep digits, minus, and one trailing separator
-          let sanitized = val.replace(/[^0-9,-.]/g, ''); 
-          if (sanitized.includes(',')) sanitized = sanitized.replace(/\./g, '').replace(',', '.');
-          
-          numValue = parseFloat(sanitized);
-          if (isNaN(numValue)) return val;
-        }
-
-        return Number(numValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      };
+      // Datas formatadas para o PDF (DD/MM/AAAA), tolerantes a qualquer entrada
+      const iniDate = normalizeDate(record['Periodo VA-VT início']);
+      const fimDate = normalizeDate(
+        record['Periodo VA-VT  fim'] || record['Periodo VA-VT fim']
+      );
 
       const pdfData = {
         nome: String(record.NOME || ''),
         cpf: String(record.CPF || ''),
-        ini: String(record['Periodo VA-VT início'] || ''),
-        fim: String(record['Periodo VA-VT  fim'] || record['Periodo VA-VT fim'] || ''),
+        ini: formatDateBR(iniDate) || String(record['Periodo VA-VT início'] || ''),
+        fim:
+          formatDateBR(fimDate) ||
+          String(record['Periodo VA-VT  fim'] || record['Periodo VA-VT fim'] || ''),
         competencia: String(competenciaVal),
         dias_uteis: String(record['DIAS ÚTEIS'] || '0'),
-        valor_unitario_va: formatMoney(record['VALOR UNITÁRIO ALIMENTAÇÃO']),
-        valor_unitario_vt: formatMoney(record['VALOR UNITÁRIO VALE TRANSPORTE']),
-        va_receita: formatMoney(record['VALOR PAGO VA'] || record['VALE ALIMENTAÇÃO']),
-        vt_receita: formatMoney(record['VALOR PAGO VT'] || record['VALE TRANSPORTE']),
+        valor_unitario_va: normalizeAndFormatMoney(record['VALOR UNITÁRIO ALIMENTAÇÃO']),
+        valor_unitario_vt: normalizeAndFormatMoney(record['VALOR UNITÁRIO VALE TRANSPORTE']),
+        va_receita: normalizeAndFormatMoney(record['VALOR PAGO VA'] || record['VALE ALIMENTAÇÃO']),
+        vt_receita: normalizeAndFormatMoney(record['VALOR PAGO VT'] || record['VALE TRANSPORTE']),
         dias_descontados: String(record['DIAS DESCONTADO'] || '0'),
-        va_despesa: formatMoney(record['VALOR DESCONTADO VA'] || record['VALE ALIMENTAÇÃO (DESCONTO POR FALTA E ATESTADO)']),
-        vt_despesa: formatMoney(record['VALOR DESCONTADO VT'] || record['VALE TRANSPORTE (DESCONTO POR FALTA E ATESTADO)']),
-        valor_liquido_depositado_va: formatMoney(record['VALOR LÍQUIDO DEPOSITADO VA']),
-        valor_liquido_depositado_vt: formatMoney(record['VALOR LÍQUIDO DEPOSITADO VT']),
+        va_despesa: normalizeAndFormatMoney(
+          record['VALOR DESCONTADO VA'] || record['VALE ALIMENTAÇÃO (DESCONTO POR FALTA E ATESTADO)']
+        ),
+        vt_despesa: normalizeAndFormatMoney(
+          record['VALOR DESCONTADO VT'] || record['VALE TRANSPORTE (DESCONTO POR FALTA E ATESTADO)']
+        ),
+        valor_liquido_depositado_va: normalizeAndFormatMoney(record['VALOR LÍQUIDO DEPOSITADO VA']),
+        valor_liquido_depositado_vt: normalizeAndFormatMoney(record['VALOR LÍQUIDO DEPOSITADO VT']),
         obs: String(record['Observação'] || record['OBSERVACAO'] || ''),
         data_atual: String(dataAtualStr)
       };
@@ -93,13 +126,19 @@ export async function POST(req: NextRequest) {
 
       db.updateReceipt(receiptId, { pdfOriginalPath: pdfPath });
 
-      logger.info(`PDF Oficial gerado para CPF: ${receipt.cpf}`, { id: receipt.id });
+      logger.info(`PDF Oficial gerado para CPF: ${receipt.cpf}`, {
+        id: receipt.id,
+        row: rowNumber,
+        competencia: competenciaVal,
+      });
 
       successCount++;
     }
 
-    logger.info(`Lote processado com sucesso. Registros: ${successCount}`);
-    return NextResponse.json({ success: true, count: successCount }, { status: 200 });
+    logger.info(`Lote processado. Sucesso: ${successCount}. Ignorados: ${skipped.length}.`, {
+      skipped,
+    });
+    return NextResponse.json({ success: true, count: successCount, skipped }, { status: 200 });
   } catch (error: any) {
     logger.error('Erro catastrofico ao processar e gerar PDFs', { error: String(error) });
     console.error('Erro ao processar e gerar Pdfs:', error);
