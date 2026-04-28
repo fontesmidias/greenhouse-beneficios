@@ -4,7 +4,9 @@ import path from "path";
 import JSZip from "jszip";
 import { requireAdmin } from "@/lib/authz";
 import { listOrphans, UPLOADS_DIR, buildDownloadFilename } from "@/lib/orphans";
-import { parseMany } from "@/lib/pdfParse";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const denied = await requireAdmin();
@@ -26,9 +28,15 @@ export async function GET(req: Request) {
     // Parse só se solicitado (cache hit é instantâneo após primeira identificação;
     // sem cache, parsear 300+ PDFs estoura timeout do proxy reverso).
     const shouldParse = searchParams.get("parse") === "true";
-    const parsedMap = shouldParse
-      ? await parseMany(orphans, UPLOADS_DIR, 5)
-      : new Map<string, undefined>();
+    let parsedMap: Map<string, any> = new Map();
+    if (shouldParse) {
+      try {
+        const { parseMany } = await import("@/lib/pdfParse");
+        parsedMap = await parseMany(orphans, UPLOADS_DIR, 5) as any;
+      } catch (e) {
+        console.error("[admin/orphans/download-all] parse falhou, ZIP sai com UUIDs", e);
+      }
+    }
 
     const zip = new JSZip();
     for (const o of orphans) {

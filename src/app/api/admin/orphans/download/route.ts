@@ -6,7 +6,9 @@ import {
   parseOrphanFilename,
   buildDownloadFilename,
 } from "@/lib/orphans";
-import { parsePdfMetadata } from "@/lib/pdfParse";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const denied = await requireAdmin();
@@ -27,7 +29,13 @@ export async function GET(req: Request) {
     const buffer = fs.readFileSync(safePath);
     const { status } = parseOrphanFilename(file);
     // Tenta usar nome parseado (cache hit é instantâneo); cai no UUID se falhar
-    const parsed = await parsePdfMetadata(safePath);
+    let parsed: any = null;
+    try {
+      const { parsePdfMetadata } = await import("@/lib/pdfParse");
+      parsed = await parsePdfMetadata(safePath);
+    } catch (e) {
+      console.error("[admin/orphans/download] parse falhou, baixando com nome UUID", e);
+    }
     const downloadName = buildDownloadFilename(file, status, parsed || undefined);
 
     return new NextResponse(buffer as any, {

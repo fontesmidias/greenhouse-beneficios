@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import { requireAdmin } from "@/lib/authz";
 import { listOrphans, safeOrphanPath, UPLOADS_DIR } from "@/lib/orphans";
-import { parseMany } from "@/lib/pdfParse";
+
+// Força runtime Node.js (não Edge). pdf-parse precisa de APIs Node.
+export const runtime = "nodejs";
+// Sem cache: a listagem reflete estado do filesystem em tempo real.
+export const dynamic = "force-dynamic";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -26,14 +30,21 @@ export async function GET(req: Request) {
     const total = all.length;
     const page = all.slice(offset, offset + limit);
 
-    let enriched = page;
+    let enriched: any[] = page;
     if (shouldParse && page.length > 0) {
-      // Parseia só a página atual — chunk pequeno nunca estoura timeout
-      const parsedMap = await parseMany(page, UPLOADS_DIR, 5);
-      enriched = page.map((o) => ({
-        ...o,
-        parsed: parsedMap.get(o.filename) || undefined,
-      }));
+      // Dynamic import: só carrega pdf-parse quando realmente precisa parsear.
+      // Evita que side effects do pdfjs-dist quebrem o startup do route handler.
+      try {
+        const { parseMany } = await import("@/lib/pdfParse");
+        const parsedMap = await parseMany(page, UPLOADS_DIR, 5);
+        enriched = page.map((o) => ({
+          ...o,
+          parsed: parsedMap.get(o.filename) || undefined,
+        }));
+      } catch (parseErr: any) {
+        console.error("[admin/orphans] parse falhou, retornando lista crua", parseErr);
+        // Não derruba a chamada — retorna sem parsed
+      }
     }
 
     return NextResponse.json({
@@ -47,7 +58,10 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error("[admin/orphans] erro ao listar", error);
-    return NextResponse.json({ error: "Falha ao listar arquivos órfãos.", details: String(error?.message || error) }, { status: 500 });
+    return NextResponse.json(
+      { error: "Falha ao listar arquivos órfãos.", details: String(error?.message || error) },
+      { status: 500 }
+    );
   }
 }
 

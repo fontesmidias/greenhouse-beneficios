@@ -6,8 +6,10 @@ import {
   parseOrphanFilename,
   buildDownloadFilename,
 } from "@/lib/orphans";
-import { parsePdfMetadata } from "@/lib/pdfParse";
 import { sendEmailMessage } from "@/lib/email";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function buildHtml(message: string | undefined) {
   const corpo =
@@ -50,7 +52,13 @@ export async function POST(req: Request) {
 
     const buffer = fs.readFileSync(safePath);
     const { status } = parseOrphanFilename(file);
-    const parsed = await parsePdfMetadata(safePath);
+    let parsed: any = null;
+    try {
+      const { parsePdfMetadata } = await import("@/lib/pdfParse");
+      parsed = await parsePdfMetadata(safePath);
+    } catch (e) {
+      console.error("[admin/orphans/send-email] parse falhou, anexo vai com nome UUID", e);
+    }
     const friendlyName = buildDownloadFilename(file, status, parsed || undefined);
 
     await sendEmailMessage(
