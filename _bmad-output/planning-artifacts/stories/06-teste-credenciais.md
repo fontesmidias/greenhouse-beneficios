@@ -1,6 +1,6 @@
 # Story 06 — Teste de credenciais SMTP e WhatsApp/Evo
 
-**Status:** Ready for Dev (vai ser executada agora pela Amelia)
+**Status:** ✅ Implementado (commit 065702a, pushado pra main)
 **Owner (PM):** John
 **Estimativa:** ~2-3h
 **Prioridade:** P0 (Bruno marcou como prioridade)
