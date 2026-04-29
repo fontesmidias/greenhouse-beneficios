@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
     try {
       // pdf-parse v1: default export é função que recebe Buffer
-      const pdfParseMod: any = await import("pdf-parse");
+      const pdfParseMod: any = await import("pdf-parse/lib/pdf-parse.js");
       const pdfParse = pdfParseMod.default || pdfParseMod;
       const buffer = fs.readFileSync(safePath);
       const result = await pdfParse(buffer);

@@ -33,8 +33,9 @@ export async function parsePdfMetadata(fullPath: string): Promise<PdfParsed | nu
   }
 
   try {
-    // Dynamic import pra evitar side effects de carregamento global
-    const pdfParseMod: any = await import("pdf-parse");
+    // Importa direto o lib interno pra pular o bloco de debug do index.js
+    // que tenta abrir './test/data/05-versions-space.pdf' (ENOENT em prod)
+    const pdfParseMod: any = await import("pdf-parse/lib/pdf-parse.js");
     const pdfParse = pdfParseMod.default || pdfParseMod;
     const buffer = fs.readFileSync(fullPath);
     const result = await pdfParse(buffer);
