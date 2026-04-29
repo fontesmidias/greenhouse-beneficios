@@ -36,21 +36,7 @@ Auto mode + push automático estão autorizados pra próxima sessão (continuida
 - ✅ **Story 06** Botão "Enviar teste" em credenciais SMTP/Evo
 - ✅ **Story 07** Filtros do dashboard (status + competência)
 - ✅ **Story 08** Reenviar recibo (e-mail/WhatsApp/ambos) sem regenerar token
-- ✅ **Story 09** Recuperador de PDFs órfãos (`/admin/orphans`)
-  - Lista com paginação 50/página
-  - Download individual com nome amigável
-  - ZIP organizado em pastas ASSINADOS/SEM_ASSINATURA
-  - Apagar
-  - Enviar por e-mail (anexo)
-  - Botão Debug + Inspect pra calibrar parser
-
-### Pendente do Bruno (deploy + smoke test)
-
-⚠️ **MAIS CRÍTICO:** o último commit (`3b9c481`) ainda **precisa subir em produção**. Sequência:
-1. Confirmar GHA build verde em https://github.com/fontesmidias/greenhouse-beneficios/actions (commits após `3b9c481`)
-2. Portainer → **Update the stack** com **"Re-pull image and redeploy"** marcado
-3. `/admin/orphans` → **♻ Limpar cache** → **🔍 Identificar arquivos (311)**
-4. Confirmar que aparece nome/CPF/competência em cada linha (não mais UUID)
+- ✅ **Story 09** Recuperador de PDFs órfãos — **REMOVIDA** após validação em prod (Bruno arquivou os PDFs externamente; feature não será mais necessária). Código deletado em 2026-04-29.
 
 ## Backlog priorizado pendente
 
@@ -79,14 +65,13 @@ Documento completo: `_bmad-output/planning-artifacts/BACKLOG_CONFIABILIDADE.md`
 ## Stories abertas (concluídas mas com follow-up possível)
 
 - **04b — Preview de upload** (stretch da 04, parsing já resolveu 90% da dor; só fazer se demanda surgir)
-- **09 etapa 3** — Botão "Reimportar pro sistema" pra ressuscitar registros órfãos no DB (condicional: depende se Bruno quer só baixar e arquivar, ou repovoar o front)
 
 ## Decisões de produto importantes (não esquecer)
 
 1. **SMTP/Evo ficam no banco**, não em `.env` — preferência explícita do Bruno
 2. **Reset de senha no fluxo "admin cria usuário" não expira** (`resetTokenExpiry = null`)
 3. **Senha do banco e NEXTAUTH_SECRET** estão **commitadas em texto plano** no histórico do GitHub (commits antes do hardening). **Considere comprometidas — rotacionar quando puder.** Procedimento documentado em `docs/ROLLOUT_FIX_DBPUSH.md`.
-4. **PDFs órfãos** vieram do incidente do `db push` que zerou a tabela Receipt. Decisão: NÃO recuperar do snapshot Contabo. Os 311 arquivos no volume são "arquivamento histórico" — Bruno baixa, organiza fora do sistema, e **opcionalmente** reimporta no futuro (Story 09 etapa 3).
+4. **PDFs órfãos** vieram do incidente do `db push` que zerou a tabela Receipt. Decisão final (2026-04-29): Bruno arquivou externamente e a feature foi removida do sistema. Snapshot Contabo NÃO será restaurado.
 
 ## Memórias persistentes salvas
 
