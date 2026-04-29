@@ -1,13 +1,16 @@
 /**
- * Wrapper sobre pdf-parse v2 (PDFParse class) para extrair texto de
- * PDFs no disco e aplicar extractFields. Cache em memória por mtime.
+ * Wrapper sobre pdf-parse v1 para extrair texto de PDFs no disco e
+ * aplicar extractFields. Cache em memória por mtime.
+ *
+ * Por que v1 e não v2: pdf-parse v2 usa pdfjs-dist novo que requer
+ * DOMMatrix/OffscreenCanvas (APIs de browser). Falha em Node puro com
+ * "DOMMatrix is not defined". v1 usa pdfjs antigo, sem essa dependência.
  *
  * extractFields fica em arquivo separado (pdfExtractFields.ts) para
- * ser testável sem precisar do pdf-parse no Jest (que usa import.meta).
+ * ser testável sem precisar do pdf-parse.
  */
 
 import fs from "fs";
-import { PDFParse } from "pdf-parse";
 import { extractFields, type PdfParsed } from "./pdfExtractFields";
 
 export type { PdfParsed } from "./pdfExtractFields";
@@ -29,32 +32,22 @@ export async function parsePdfMetadata(fullPath: string): Promise<PdfParsed | nu
     return cached.parsed;
   }
 
-  let parser: PDFParse | null = null;
   try {
+    // Dynamic import pra evitar side effects de carregamento global
+    const pdfParseMod: any = await import("pdf-parse");
+    const pdfParse = pdfParseMod.default || pdfParseMod;
     const buffer = fs.readFileSync(fullPath);
-    parser = new PDFParse({ data: new Uint8Array(buffer) });
-    const result = await parser.getText();
-    const text =
-      typeof (result as any).text === "string"
-        ? (result as any).text
-        : Array.isArray((result as any).pages)
-          ? (result as any).pages.map((p: any) => p.text || "").join("\n")
-          : "";
+    const result = await pdfParse(buffer);
+    const text: string = result?.text || "";
 
     const parsed = extractFields(text);
-    // Só cacheia resultados positivos (algum campo foi extraído).
-    // Nulls são re-tentados — permite reidentificar após ajuste de regex
-    // sem precisar limpar manualmente.
     if (parsed.nome || parsed.cpf || parsed.competencia) {
       cache.set(fullPath, { mtime, parsed });
     }
     return parsed;
   } catch (e) {
+    console.error("[pdfParse] falha ao parsear", fullPath, String(e));
     return null;
-  } finally {
-    if (parser) {
-      try { await parser.destroy(); } catch {}
-    }
   }
 }
 

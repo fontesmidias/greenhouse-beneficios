@@ -32,17 +32,12 @@ export async function GET(req: Request) {
     let error: string | null = null;
 
     try {
-      const { PDFParse } = await import("pdf-parse");
+      // pdf-parse v1: default export é função que recebe Buffer
+      const pdfParseMod: any = await import("pdf-parse");
+      const pdfParse = pdfParseMod.default || pdfParseMod;
       const buffer = fs.readFileSync(safePath);
-      const parser = new PDFParse({ data: new Uint8Array(buffer) });
-      const result = await parser.getText();
-      rawText =
-        typeof (result as any).text === "string"
-          ? (result as any).text
-          : Array.isArray((result as any).pages)
-            ? (result as any).pages.map((p: any) => p.text || "").join("\n---PAGE---\n")
-            : JSON.stringify(result).slice(0, 2000);
-      try { await parser.destroy(); } catch {}
+      const result = await pdfParse(buffer);
+      rawText = result?.text || "";
     } catch (e: any) {
       error = String(e?.message || e);
     }
